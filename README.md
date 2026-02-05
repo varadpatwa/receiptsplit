@@ -1,0 +1,142 @@
+# ReceiptSplit
+
+A mobile-first web app that helps groups split restaurant bills in under 60 seconds with cent-perfect accuracy.
+
+## Features
+
+- **5-Step Flow**: Receipt → People → Assign → Summary → Export
+- **Cent-Perfect Accuracy**: Advanced calculation engine ensures exact splits with no rounding errors
+- **Apple-Inspired UI**: Minimal, high-contrast design with smooth micro-interactions
+- **Local Storage**: Automatically saves splits for later access
+- **Smart Assignment**: Easily assign items to multiple people with tap-to-toggle chips
+- **Running Tally**: Live updates show each person's share as you assign items
+- **Shareable Breakdown**: Copy or share detailed per-person breakdowns
+- **Mobile-First**: Optimized for touch with generous tap targets and decimal keyboards
+
+## Tech Stack
+
+- **React 18** with TypeScript
+- **Vite** for blazing-fast development
+- **Tailwind CSS** for utility-first styling
+- **Lucide React** for icons
+- **localStorage** for data persistence
+
+## Project Structure
+
+```
+src/
+├── types/
+│   └── split.ts              # TypeScript interfaces for Split, Item, Participant
+├── utils/
+│   ├── storage.ts            # localStorage operations
+│   ├── calculations.ts       # Cent-perfect split calculations
+│   └── formatting.ts         # Currency and date formatting
+├── hooks/
+│   ├── useSplits.ts          # Split management with autosave
+│   └── useCalculations.ts    # Memoized breakdown calculations
+├── components/
+│   ├── Layout.tsx            # Main layout with radial gradient
+│   ├── Stepper.tsx           # Step progress indicator
+│   ├── Button.tsx            # Primary/secondary buttons
+│   ├── Input.tsx             # Text/number inputs with validation
+│   ├── Card.tsx              # Elevated container component
+│   ├── ParticipantChip.tsx   # Toggle chips for assignment
+│   ├── Toast.tsx             # Slide-up notifications
+│   └── screens/
+│       ├── Home.tsx          # Split list with create/delete
+│       ├── Receipt.tsx       # Item entry with tax/tip
+│       ├── People.tsx        # Participant management
+│       ├── Assign.tsx        # Item-to-person assignment
+│       ├── Summary.tsx       # Per-person breakdown view
+│       └── Export.tsx        # Copy/share functionality
+└── App.tsx                   # Main app with screen routing
+```
+
+## Calculation Engine
+
+The calculation engine guarantees cent-perfect accuracy using integer arithmetic:
+
+1. **Equal Split**: Divides item cost by participant count, distributes remainder cents by participantId (ascending)
+2. **Proportional Allocation**: Tax and tip are allocated proportionally to each person's item subtotal
+3. **Remainder Distribution**: Any fractional cents are distributed one-by-one to participants in sorted order
+4. **Reconciliation**: Total of all participant amounts always equals receipt total exactly
+
+## Key Design Principles
+
+### Apple iOS Native Aesthetic
+- Near-black background (#0B0B0C) with subtle radial gradient
+- Pure white text with careful hierarchy (white → white/80 → white/60 → white/40)
+- Cards on #141416 with border-white/10 for gentle elevation
+- Monochrome palette - no color accents except for validation states
+- Generous spacing: px-5 py-6, space-y-6 between sections
+- Active states use scale-95 with 150ms transitions
+- Minimum 44px tap targets for all interactive elements
+
+### Typography
+- System font stack: -apple-system, BlinkMacSystemFont
+- Headers: text-2xl to text-3xl with font-semibold and tracking-tight
+- Body: text-base with font-normal
+- Numbers: tabular-nums for perfect alignment
+
+### Motion
+- 200ms ease-out page transitions with 8px slide
+- 150ms chip toggles and button presses
+- Toast notifications slide up from bottom
+- Active states scale to 95%
+- Subtle fade-in animations for modal overlays
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
+
+# Build for production
+npm run build
+
+# Type check
+npx tsc --noEmit
+```
+
+## Usage Flow
+
+1. **Home**: Tap "New Split" or select an existing split
+2. **Receipt**: Add items with prices and quantities, enter tax/tip
+3. **People**: Add at least 2 participants
+4. **Assign**: Tap participant chips to assign items (multi-select supported)
+5. **Summary**: Review per-person breakdowns with exact totals
+6. **Export**: Copy or share the breakdown text
+
+## Features in Detail
+
+### Autosave
+- Debounced 300ms during typing
+- Immediate save on blur and navigation
+- Persists to localStorage automatically
+
+### Validation
+- Prices must be greater than $0
+- At least 2 participants required
+- All items must be assigned before proceeding
+- Real-time error messages with inline feedback
+
+### Edge Cases Handled
+- Empty item names → Shows "Unnamed item"
+- Zero prices → Validation error
+- Participant deletion → Removes from all assignments
+- Item deletion → Removes all participant assignments
+- All subtotals zero → Tax/tip allocated as $0.00
+
+## Browser Support
+
+- Modern browsers with ES2020+ support
+- localStorage required
+- Native share API optional (fallback to clipboard)
+
+## License
+
+MIT
+
