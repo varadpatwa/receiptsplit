@@ -5,8 +5,18 @@ import { Stepper } from '@/components/Stepper';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
-import { Split, Item } from '@/types/split';
+import { Split, Item, SplitCategory } from '@/types/split';
 import { generateId, formatCurrency, isValidMoneyInput, moneyStringToCents, centsToMoneyString } from '@/utils/formatting';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface ReceiptScreenProps {
   split: Split;
@@ -22,6 +32,7 @@ export const ReceiptScreen: React.FC<ReceiptScreenProps> = ({
   onBack
 }) => {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   // Local string state for money inputs (allows natural typing)
   const [priceInputs, setPriceInputs] = useState<{ [itemId: string]: string }>({});
   const [taxInput, setTaxInput] = useState<string>('');
@@ -160,7 +171,16 @@ export const ReceiptScreen: React.FC<ReceiptScreenProps> = ({
   const total = subtotal + split.taxInCents + split.tipInCents;
   
   const hasValidItems = split.items.some(item => item.priceInCents > 0);
-  const canProceed = hasValidItems && Object.keys(errors).length === 0;
+  const hasCategory = !!split.category;
+  const canProceed = hasValidItems && Object.keys(errors).length === 0 && hasCategory;
+  
+  const handleNext = () => {
+    if (!hasCategory) {
+      setShowCategoryDialog(true);
+      return;
+    }
+    onNext();
+  };
   
   return (
     <Layout>
@@ -179,6 +199,34 @@ export const ReceiptScreen: React.FC<ReceiptScreenProps> = ({
         </div>
         
         <Stepper currentStep="receipt" />
+        
+        {/* Category Selector */}
+        <Card className="space-y-3">
+          <h3 className="font-semibold text-white">
+            Category {!hasCategory && <span className="text-red-400">*</span>}
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {(['Restaurant', 'Grocery', 'Entertainment', 'Utilities', 'Other'] as SplitCategory[]).map(category => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => onUpdate({ ...split, category })}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                  split.category === category
+                    ? 'bg-white text-black'
+                    : 'bg-white/5 text-white/80 border border-white/10 hover:bg-white/10'
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+          {!hasCategory && (
+            <p className="text-sm text-white/60">
+              Please select a category to continue
+            </p>
+          )}
+        </Card>
         
         {/* Items */}
         <Card className="space-y-4">
@@ -316,10 +364,27 @@ export const ReceiptScreen: React.FC<ReceiptScreenProps> = ({
         </Card>
         
         {/* Next Button */}
-        <Button onClick={onNext} disabled={!canProceed} className="w-full">
+        <Button onClick={handleNext} disabled={!hasValidItems || Object.keys(errors).length > 0} className="w-full">
           Next: Add People
         </Button>
       </div>
+      
+      {/* Category Required Dialog */}
+      <AlertDialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Category Required</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please select a category before proceeding.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowCategoryDialog(false)}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 };

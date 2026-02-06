@@ -16,6 +16,8 @@ export interface Participant {
   name: string;
 }
 
+export type SplitCategory = 'Restaurant' | 'Grocery' | 'Entertainment' | 'Utilities' | 'Other';
+
 export interface Split {
   id: string;
   name: string;
@@ -26,6 +28,7 @@ export interface Split {
   taxInCents: number;
   tipInCents: number;
   currentStep: 'receipt' | 'people' | 'assign' | 'summary' | 'export';
+  category?: SplitCategory;
 }
 
 export interface ParticipantBreakdown {

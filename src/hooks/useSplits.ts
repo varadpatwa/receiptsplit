@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Split } from '@/types/split';
+import { Split, SplitCategory } from '@/types/split';
 import { loadSplits, saveSplit as saveSplitToStorage, deleteSplit as deleteSplitFromStorage } from '@/utils/storage';
 import { generateId } from '@/utils/formatting';
 
@@ -26,6 +26,7 @@ export const useSplits = () => {
       taxInCents: 0,
       tipInCents: 0,
       currentStep: 'receipt'
+      // category is intentionally undefined - user must select
     };
     
     setCurrentSplit(newSplit);
