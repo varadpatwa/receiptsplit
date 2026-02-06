@@ -130,7 +130,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Button variant="secondary" onClick={cancelDelete} className="flex-1">
                 Cancel
               </Button>
-              <Button onClick={confirmDelete} className="flex-1 bg-red-500 text-white">
+              <Button onClick={confirmDelete} className="flex-1 bg-white text-black">
                 Delete
               </Button>
             </div>
