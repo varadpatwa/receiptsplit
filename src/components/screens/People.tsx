@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, Trash2, ChevronLeft } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Stepper } from '@/components/Stepper';
@@ -32,9 +33,11 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
   const [newName, setNewName] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
   
   // Get current participant IDs (for exclusion)
   const currentParticipantIds = new Set(split.participants.map(p => p.id));
@@ -105,15 +108,64 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
     return result;
   }, [newName, availableFriends, availableRecent]);
   
+  // Calculate dropdown position based on input's boundingClientRect
+  const updateDropdownPosition = () => {
+    if (inputRef.current && inputContainerRef.current) {
+      requestAnimationFrame(() => {
+        if (inputRef.current && inputContainerRef.current) {
+          const inputRect = inputRef.current.getBoundingClientRect();
+          const containerRect = inputContainerRef.current.getBoundingClientRect();
+          
+          setDropdownPosition({
+            top: inputRect.bottom + 8,
+            left: containerRect.left,
+            width: containerRect.width
+          });
+        }
+      });
+    }
+  };
+
   // Update selected index when suggestions change
   useEffect(() => {
     if (suggestions.length > 0) {
       setSelectedIndex(0);
       setShowSuggestions(true);
+      updateDropdownPosition();
     } else {
       setShowSuggestions(false);
+      setDropdownPosition(null);
     }
   }, [suggestions]);
+
+  // Update position when dropdown visibility changes
+  useEffect(() => {
+    if (showSuggestions && suggestions.length > 0) {
+      updateDropdownPosition();
+    } else {
+      setDropdownPosition(null);
+    }
+  }, [showSuggestions]);
+
+  // Update position on window resize and scroll
+  useEffect(() => {
+    if (!showSuggestions || !inputRef.current) return;
+
+    const handleUpdate = () => {
+      updateDropdownPosition();
+    };
+
+    // Use capture phase for scroll to catch all scroll events
+    window.addEventListener('resize', handleUpdate);
+    window.addEventListener('scroll', handleUpdate, true);
+    document.addEventListener('scroll', handleUpdate, true);
+
+    return () => {
+      window.removeEventListener('resize', handleUpdate);
+      window.removeEventListener('scroll', handleUpdate, true);
+      document.removeEventListener('scroll', handleUpdate, true);
+    };
+  }, [showSuggestions]);
   
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -122,7 +174,9 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node) &&
         inputRef.current &&
-        !inputRef.current.contains(event.target as Node)
+        !inputRef.current.contains(event.target as Node) &&
+        inputContainerRef.current &&
+        !inputContainerRef.current.contains(event.target as Node)
       ) {
         setShowSuggestions(false);
       }
@@ -274,7 +328,7 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
         <Card className="space-y-4 overflow-visible">
           <h3 className="font-semibold text-white">Who's splitting?</h3>
           
-          <div className="relative z-[1000]">
+          <div className="relative z-[1000]" ref={inputContainerRef}>
             <div className="flex gap-3">
               <div className="flex-1 relative">
                 <Input
@@ -293,60 +347,6 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
                   }}
                   className="w-full"
                 />
-                
-                {/* Typeahead Dropdown */}
-                {showSuggestions && suggestions.length > 0 && (
-                  <div
-                    ref={dropdownRef}
-                    className="absolute top-full left-0 right-0 mt-2 z-[999] rounded-xl border border-white/10 bg-[#151517] shadow-lg overflow-hidden max-h-[300px] overflow-y-auto"
-                    style={{ backgroundColor: '#151517' }}
-                  >
-                    {suggestions.map((suggestion, index) => {
-                      let displayText = '';
-                      let badgeText = '';
-                      let badgeColor = '';
-                      
-                      switch (suggestion.type) {
-                        case 'friend':
-                          displayText = suggestion.friend.name;
-                          badgeText = 'Saved';
-                          badgeColor = 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-                          break;
-                        case 'recent':
-                          displayText = suggestion.name;
-                          badgeText = 'Recent';
-                          badgeColor = 'bg-white/10 text-white/80 border-white/20';
-                          break;
-                        case 'add-temp':
-                          displayText = `Add "${suggestion.name}" as Temp`;
-                          badgeText = '';
-                          break;
-                        case 'add-friend':
-                          displayText = `Add "${suggestion.name}" as Friend`;
-                          badgeText = '';
-                          break;
-                      }
-                      
-                      return (
-                        <button
-                          key={`${suggestion.type}-${index}`}
-                          type="button"
-                          onClick={() => handleSuggestionSelect(suggestion)}
-                          className={`w-full px-4 py-3 text-left text-white hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0 flex items-center justify-between ${
-                            index === selectedIndex ? 'bg-white/5' : ''
-                          }`}
-                        >
-                          <span>{displayText}</span>
-                          {badgeText && (
-                            <span className={`rounded-full px-2 py-0.5 text-xs border ${badgeColor}`}>
-                              {badgeText}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
               <Button 
                 onClick={() => {
@@ -360,6 +360,65 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
               </Button>
             </div>
           </div>
+          
+          {/* Typeahead Dropdown (Portal) */}
+          {showSuggestions && suggestions.length > 0 && dropdownPosition && createPortal(
+            <div
+              ref={dropdownRef}
+              className="fixed z-[9999] rounded-xl border border-white/10 bg-[#151517] shadow-lg overflow-hidden max-h-[300px] overflow-y-auto"
+              style={{
+                top: `${dropdownPosition.top}px`,
+                left: `${dropdownPosition.left}px`,
+                width: `${dropdownPosition.width}px`
+              }}
+            >
+              {suggestions.map((suggestion, index) => {
+                let displayText = '';
+                let badgeText = '';
+                let badgeColor = '';
+                
+                switch (suggestion.type) {
+                  case 'friend':
+                    displayText = suggestion.friend.name;
+                    badgeText = 'Saved';
+                    badgeColor = 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+                    break;
+                  case 'recent':
+                    displayText = suggestion.name;
+                    badgeText = 'Recent';
+                    badgeColor = 'bg-white/10 text-white/80 border-white/20';
+                    break;
+                  case 'add-temp':
+                    displayText = `Add "${suggestion.name}" as Temp`;
+                    badgeText = '';
+                    break;
+                  case 'add-friend':
+                    displayText = `Add "${suggestion.name}" as Friend`;
+                    badgeText = '';
+                    break;
+                }
+                
+                return (
+                  <button
+                    key={`${suggestion.type}-${index}`}
+                    type="button"
+                    onClick={() => handleSuggestionSelect(suggestion)}
+                    className={`w-full px-4 py-3 text-left text-white hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0 flex items-center justify-between ${
+                      index === selectedIndex ? 'bg-white/5' : ''
+                    }`}
+                  >
+                    <span>{displayText}</span>
+                    {badgeText && (
+                      <span className={`rounded-full px-2 py-0.5 text-xs border ${badgeColor}`}>
+                        {badgeText}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>,
+            document.body
+          )}
           
           {/* Recent People Chips (capped to 5) */}
           {availableRecent.length > 0 && (
@@ -426,7 +485,7 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
         )}
         
         {/* Next Button */}
-        <div className="space-y-3 relative z-10">
+        <div className="space-y-3">
           {!canProceed && (
             <p className="text-center text-sm text-white/60">
               Need at least 2 people to split the bill
