@@ -14,6 +14,7 @@ export interface ItemAssignment {
 export interface Participant {
   id: string;
   name: string;
+  source?: 'friend' | 'temp';
 }
 
 export type SplitCategory = 'Restaurant' | 'Grocery' | 'Entertainment' | 'Utilities' | 'Other';

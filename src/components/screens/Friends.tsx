@@ -4,31 +4,44 @@ import { Layout } from '@/components/Layout';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
-import { getFriends, addFriend, removeFriend, type StoredFriend } from '@/utils/friendsStorage';
-import { generateId } from '@/utils/formatting';
+import { getFriends, addFriend, removeFriend, type Friend } from '@/utils/friends';
 
-export const FriendsScreen: React.FC = () => {
-  const [friends, setFriends] = useState<StoredFriend[]>([]);
+function FriendsContent() {
+  const [friends, setFriends] = useState<Friend[]>([]);
   const [newName, setNewName] = useState('');
 
   useEffect(() => {
-    setFriends(getFriends());
+    try {
+      setFriends(getFriends());
+    } catch (e) {
+      setFriends([]);
+    }
   }, []);
 
   const handleAdd = () => {
     if (!newName.trim()) return;
-    const added = addFriend(newName.trim(), generateId);
-    setFriends(getFriends());
-    setNewName('');
+    try {
+      addFriend(newName.trim());
+      setFriends(getFriends());
+      setNewName('');
+    } catch (e) {
+      setFriends(getFriends());
+    }
   };
 
   const handleRemove = (id: string) => {
-    removeFriend(id);
-    setFriends(getFriends());
+    try {
+      removeFriend(id);
+      setFriends(getFriends());
+    } catch (e) {
+      setFriends(getFriends());
+    }
   };
 
+  const list = Array.isArray(friends) ? friends : [];
+
   return (
-    <Layout>
+    <>
       <div className="space-y-6 pb-24">
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold tracking-tight text-white">
@@ -57,13 +70,13 @@ export const FriendsScreen: React.FC = () => {
 
         <Card className="space-y-4">
           <h3 className="font-semibold text-white">Saved friends</h3>
-          {friends.length === 0 ? (
+          {list.length === 0 ? (
             <p className="py-6 text-center text-white/60">
               No friends yet. Add one above.
             </p>
           ) : (
             <div className="space-y-2">
-              {friends.map(friend => (
+              {list.map(friend => (
                 <div
                   key={friend.id}
                   className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-4"
@@ -83,6 +96,28 @@ export const FriendsScreen: React.FC = () => {
           )}
         </Card>
       </div>
-    </Layout>
+    </>
   );
+}
+
+export const FriendsScreen: React.FC = () => {
+  try {
+    return (
+      <Layout>
+        <FriendsContent />
+      </Layout>
+    );
+  } catch (error) {
+    console.error('FriendsScreen error:', error);
+    return (
+      <Layout>
+        <div className="space-y-6 pb-24">
+          <h1 className="text-2xl font-semibold text-white">Friends</h1>
+          <Card className="space-y-4 p-6">
+            <p className="text-white/60">Something went wrong. Try refreshing the app.</p>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
 };

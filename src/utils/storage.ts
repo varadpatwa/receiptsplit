@@ -1,12 +1,61 @@
-import { Split } from '@/types/split';
+import { Split, Participant } from '@/types/split';
+import { generateId } from './formatting';
 
 const STORAGE_KEY = 'receiptsplit:splits';
+
+/**
+ * Migrate old participant data to new format with IDs
+ */
+function migrateParticipant(p: unknown): Participant {
+  if (p && typeof p === 'object' && 'id' in p && 'name' in p) {
+    // Already in new format
+    return {
+      id: String((p as { id: unknown }).id),
+      name: String((p as { name: unknown }).name),
+      source: 'source' in p ? (p as { source?: unknown }).source as 'friend' | 'temp' : undefined,
+    };
+  }
+  // Old format: just a string name
+  if (typeof p === 'string') {
+    return {
+      id: generateId(),
+      name: p.trim(),
+      source: undefined,
+    };
+  }
+  // Fallback
+  return {
+    id: generateId(),
+    name: String(p || 'Unknown'),
+    source: undefined,
+  };
+}
 
 export const loadSplits = (): Split[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return [];
-    return JSON.parse(stored);
+    const splits = JSON.parse(stored) as Split[];
+    
+    // Migrate participants if needed
+    return splits.map(split => {
+      if (!Array.isArray(split.participants)) {
+        return split;
+      }
+      
+      const needsMigration = split.participants.some(
+        p => typeof p === 'string' || !('id' in p)
+      );
+      
+      if (!needsMigration) {
+        return split;
+      }
+      
+      return {
+        ...split,
+        participants: split.participants.map(migrateParticipant),
+      };
+    });
   } catch (error) {
     console.error('Failed to load splits:', error);
     return [];
