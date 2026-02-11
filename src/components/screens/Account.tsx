@@ -52,9 +52,11 @@ export const AccountScreen: React.FC = () => {
     setEmailConfirmationSent(false);
 
     try {
+      const redirectTo = `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`;
       const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: { emailRedirectTo: redirectTo },
       });
 
       if (error) {
