@@ -1,7 +1,12 @@
 import { Split, Participant } from '@/types/split';
 import { generateId } from './formatting';
 
-const STORAGE_KEY = 'receiptsplit:splits';
+const STORAGE_KEY_PREFIX = 'receiptsplit:splits';
+const LEGACY_KEY = 'receiptsplit:splits';
+
+function getStorageKey(userId: string | null): string {
+  return `${STORAGE_KEY_PREFIX}:${userId ?? 'anonymous'}`;
+}
 
 /**
  * Migrate old participant data to new format with IDs
@@ -31,9 +36,22 @@ function migrateParticipant(p: unknown): Participant {
   };
 }
 
-export const loadSplits = (): Split[] => {
+/**
+ * Load splits for the given user. userId = null means anonymous (signed out).
+ * Migrates legacy key receiptsplit:splits to receiptsplit:splits:anonymous once.
+ */
+export const loadSplits = (userId: string | null): Split[] => {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const key = getStorageKey(userId);
+    let stored = localStorage.getItem(key);
+    // One-time migration: copy legacy key to anonymous
+    if (userId === null && !stored) {
+      const legacy = localStorage.getItem(LEGACY_KEY);
+      if (legacy) {
+        localStorage.setItem(key, legacy);
+        stored = legacy;
+      }
+    }
     if (!stored) return [];
     const splits = JSON.parse(stored) as Split[];
     
@@ -62,16 +80,16 @@ export const loadSplits = (): Split[] => {
   }
 };
 
-export const saveSplits = (splits: Split[]): void => {
+export const saveSplits = (splits: Split[], userId: string | null): void => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(splits));
+    localStorage.setItem(getStorageKey(userId), JSON.stringify(splits));
   } catch (error) {
     console.error('Failed to save splits:', error);
   }
 };
 
-export const saveSplit = (split: Split): void => {
-  const splits = loadSplits();
+export const saveSplit = (split: Split, userId: string | null): void => {
+  const splits = loadSplits(userId);
   const index = splits.findIndex(s => s.id === split.id);
   
   if (index >= 0) {
@@ -80,16 +98,16 @@ export const saveSplit = (split: Split): void => {
     splits.push(split);
   }
   
-  saveSplits(splits);
+  saveSplits(splits, userId);
 };
 
-export const deleteSplit = (splitId: string): void => {
-  const splits = loadSplits();
+export const deleteSplit = (splitId: string, userId: string | null): void => {
+  const splits = loadSplits(userId);
   const filtered = splits.filter(s => s.id !== splitId);
-  saveSplits(filtered);
+  saveSplits(filtered, userId);
 };
 
-export const getSplit = (splitId: string): Split | null => {
-  const splits = loadSplits();
+export const getSplit = (splitId: string, userId: string | null): Split | null => {
+  const splits = loadSplits(userId);
   return splits.find(s => s.id === splitId) || null;
 };

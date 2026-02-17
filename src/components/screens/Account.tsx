@@ -5,6 +5,22 @@ import { Input } from '@/components/Input';
 import { Button } from '@/components/Button';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import type { Session, User } from '@supabase/supabase-js';
+import { useAuth } from '@/contexts/AuthContext';
+import { loadSplits } from '@/utils/storage';
+import { getFriends } from '@/utils/friends';
+
+/** Normalize any error to a user-facing string. Avoids showing "{}" or [object Object]. */
+function toErrorString(e: unknown): string {
+  if (typeof e === 'string' && e.trim()) return e.trim();
+  if (e && typeof e === 'object' && 'message' in e) {
+    const msg = (e as { message?: unknown }).message;
+    if (typeof msg === 'string' && msg.trim() && msg !== '{}') return msg.trim();
+  }
+  if (e instanceof Error && e.message) return e.message;
+  return 'Something went wrong. Please try again.';
+}
+
+const SIGNUP_TIMEOUT_MS = 20_000;
 
 export const AccountScreen: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -16,58 +32,49 @@ export const AccountScreen: React.FC = () => {
   const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
 
-  // Check initial session and listen for auth changes
   useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      return;
-    }
-
-    // Get initial session
+    if (!isSupabaseConfigured()) return;
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
     });
-
-    // Listen for auth state changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setEmailConfirmationSent(false);
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isSupabaseConfigured()) {
-      setError('Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.');
+      setError('Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
       return;
     }
-
     setLoading(true);
     setError(null);
     setEmailConfirmationSent(false);
-
     try {
       const redirectTo = `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`;
-      const { error } = await supabase.auth.signUp({
+      const signUpPromise = supabase.auth.signUp({
         email,
         password,
         options: { emailRedirectTo: redirectTo },
       });
-
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timed out. Check your connection and try again.')), SIGNUP_TIMEOUT_MS)
+      );
+      const { error } = await Promise.race([signUpPromise, timeoutPromise]);
       if (error) {
-        setError(error.message);
+        setError(toErrorString(error));
       } else {
         setEmailConfirmationSent(true);
         setEmail('');
         setPassword('');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      setError(toErrorString(err));
     } finally {
       setLoading(false);
     }
@@ -76,27 +83,20 @@ export const AccountScreen: React.FC = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isSupabaseConfigured()) {
-      setError('Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.');
+      setError('Supabase is not configured.');
       return;
     }
-
     setLoading(true);
     setError(null);
-
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        setError(error.message);
-      } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) setError(toErrorString(error));
+      else {
         setEmail('');
         setPassword('');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      setError(toErrorString(err));
     } finally {
       setLoading(false);
     }
@@ -107,43 +107,36 @@ export const AccountScreen: React.FC = () => {
       setError('Supabase is not configured.');
       return;
     }
-
     setLoading(true);
     setError(null);
-
     try {
       const { error } = await supabase.auth.signOut();
-      if (error) {
-        setError(error.message);
-      }
+      if (error) setError(toErrorString(error));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      setError(toErrorString(err));
     } finally {
       setLoading(false);
     }
   };
 
   const hasEnvVars = isSupabaseConfigured();
+  const auth = useAuth();
+  const splitsCount = loadSplits(auth.userId).length;
+  const friendsCount = getFriends(auth.userId).length;
 
   return (
     <Layout>
       <div className="space-y-6 pb-24">
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-white">
-            Account
-          </h1>
-          <p className="text-white/60">
-            Sign in and manage your data.
-          </p>
+          <h1 className="text-3xl font-semibold tracking-tight text-white">Account</h1>
+          <p className="text-white/60">Sign in and manage your data.</p>
         </div>
 
         {!hasEnvVars && (
           <Card className="space-y-2 p-4 border-yellow-500/30 bg-yellow-500/10">
-            <p className="text-yellow-400 text-sm font-medium">
-              ⚠️ Supabase not configured
-            </p>
+            <p className="text-yellow-400 text-sm font-medium">Supabase not configured</p>
             <p className="text-yellow-400/80 text-xs">
-              Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.
+              Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local
             </p>
           </Card>
         )}
@@ -151,17 +144,8 @@ export const AccountScreen: React.FC = () => {
         {session && user ? (
           <Card className="space-y-4 p-6">
             <h2 className="text-lg font-semibold text-white">Signed in</h2>
-            <div className="space-y-2">
-              <p className="text-white/80">
-                <span className="font-medium">Email:</span> {user.email}
-              </p>
-            </div>
-            <Button
-              onClick={handleSignOut}
-              disabled={loading}
-              variant="secondary"
-              className="w-full"
-            >
+            <p className="text-white/80"><span className="font-medium">Email:</span> {user.email}</p>
+            <Button onClick={handleSignOut} disabled={loading} variant="secondary" className="w-full">
               {loading ? 'Signing out...' : 'Sign out'}
             </Button>
           </Card>
@@ -170,12 +154,9 @@ export const AccountScreen: React.FC = () => {
             <h2 className="text-lg font-semibold text-white">
               {emailConfirmationSent ? 'Check your email' : 'Sign in / Sign up'}
             </h2>
-
             {emailConfirmationSent ? (
               <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
-                <p className="text-blue-400">
-                  Check your email to confirm your account.
-                </p>
+                <p className="text-blue-400">Check your email to confirm your account.</p>
               </div>
             ) : (
               <form onSubmit={handleSignIn} className="space-y-4">
@@ -188,7 +169,6 @@ export const AccountScreen: React.FC = () => {
                   required
                   disabled={loading}
                 />
-
                 <Input
                   type="password"
                   label="Password"
@@ -198,19 +178,13 @@ export const AccountScreen: React.FC = () => {
                   required
                   disabled={loading}
                 />
-
-                {error && (
+                {error && typeof error === 'string' && error.trim() && (
                   <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-                    <p className="text-red-400 text-sm">{error}</p>
+                    <p className="text-red-400 text-sm">{String(error).trim()}</p>
                   </div>
                 )}
-
                 <div className="flex gap-3">
-                  <Button
-                    type="submit"
-                    disabled={loading || !email || !password}
-                    className="flex-1"
-                  >
+                  <Button type="submit" disabled={loading || !email || !password} className="flex-1">
                     {loading ? 'Signing in...' : 'Sign in'}
                   </Button>
                   <Button
@@ -228,7 +202,6 @@ export const AccountScreen: React.FC = () => {
           </Card>
         )}
 
-        {/* Debug Section */}
         <Card className="space-y-2 p-4">
           <button
             onClick={() => setShowDebug(!showDebug)}
@@ -249,6 +222,22 @@ export const AccountScreen: React.FC = () => {
                 <span className={session ? 'text-green-400' : 'text-red-400'}>
                   {session ? 'true' : 'false'}
                 </span>
+              </div>
+              <div>
+                <span className="text-white/80">User id:</span>{' '}
+                <span className="text-white/90 break-all">{auth.userId ?? '—'}</span>
+              </div>
+              <div>
+                <span className="text-white/80">Email:</span>{' '}
+                <span className="text-white/90 break-all">{auth.email ?? '—'}</span>
+              </div>
+              <div>
+                <span className="text-white/80">Splits count:</span>{' '}
+                <span className="text-white/90">{splitsCount}</span>
+              </div>
+              <div>
+                <span className="text-white/80">Friends count:</span>{' '}
+                <span className="text-white/90">{friendsCount}</span>
               </div>
               {import.meta.env.VITE_SUPABASE_URL && (
                 <div className="break-all">

@@ -1,18 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Split, SplitCategory } from '@/types/split';
+import { Split } from '@/types/split';
 import { loadSplits, saveSplit as saveSplitToStorage, deleteSplit as deleteSplitFromStorage } from '@/utils/storage';
 import { generateId } from '@/utils/formatting';
+import { useAuthUserId } from '@/contexts/AuthContext';
 
 export const useSplits = () => {
+  const userId = useAuthUserId();
   const [splits, setSplits] = useState<Split[]>([]);
   const [currentSplit, setCurrentSplit] = useState<Split | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Load splits on mount
+  // Load splits when userId changes (SIGNED_IN / SIGNED_OUT)
   useEffect(() => {
-    const loaded = loadSplits();
+    const loaded = loadSplits(userId);
     setSplits(loaded);
-  }, []);
+    setCurrentSplit(null);
+  }, [userId]);
   
   // Create new split
   const createNewSplit = useCallback((): Split => {
@@ -51,7 +54,7 @@ export const useSplits = () => {
     }
     
     const doSave = () => {
-      saveSplitToStorage(split);
+      saveSplitToStorage(split, userId);
       setSplits(prev => {
         const index = prev.findIndex(s => s.id === split.id);
         if (index >= 0) {
@@ -69,17 +72,17 @@ export const useSplits = () => {
       // Debounce for 300ms
       saveTimeoutRef.current = setTimeout(doSave, 300);
     }
-  }, []);
+  }, [userId]);
   
   // Delete split
   const deleteSplit = useCallback((splitId: string) => {
-    deleteSplitFromStorage(splitId);
+    deleteSplitFromStorage(splitId, userId);
     setSplits(prev => prev.filter(s => s.id !== splitId));
     
     if (currentSplit?.id === splitId) {
       setCurrentSplit(null);
     }
-  }, [currentSplit]);
+  }, [currentSplit, userId]);
   
   // Update current split
   const updateCurrentSplit = useCallback((updater: (split: Split) => Split) => {

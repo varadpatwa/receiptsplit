@@ -5,36 +5,38 @@ import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { getFriends, addFriend, removeFriend, type Friend } from '@/utils/friends';
+import { useAuthUserId } from '@/contexts/AuthContext';
 
 function FriendsContent() {
+  const userId = useAuthUserId();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [newName, setNewName] = useState('');
 
   useEffect(() => {
     try {
-      setFriends(getFriends());
+      setFriends(getFriends(userId));
     } catch (e) {
       setFriends([]);
     }
-  }, []);
+  }, [userId]);
 
   const handleAdd = () => {
     if (!newName.trim()) return;
     try {
-      addFriend(newName.trim());
-      setFriends(getFriends());
+      addFriend(newName.trim(), userId);
+      setFriends(getFriends(userId));
       setNewName('');
     } catch (e) {
-      setFriends(getFriends());
+      setFriends(getFriends(userId));
     }
   };
 
   const handleRemove = (id: string) => {
     try {
-      removeFriend(id);
-      setFriends(getFriends());
+      removeFriend(id, userId);
+      setFriends(getFriends(userId));
     } catch (e) {
-      setFriends(getFriends());
+      setFriends(getFriends(userId));
     }
   };
 

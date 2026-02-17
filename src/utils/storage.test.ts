@@ -48,7 +48,7 @@ describe('storage', () => {
 
       localStorageMock.setItem('receiptsplit:splits', JSON.stringify([oldSplit]));
 
-      const loaded = loadSplits();
+      const loaded = loadSplits(null);
       expect(loaded).toHaveLength(1);
       expect(loaded[0].category).toBeUndefined();
     });
@@ -69,7 +69,7 @@ describe('storage', () => {
 
       localStorageMock.setItem('receiptsplit:splits', JSON.stringify([splitWithCategory]));
 
-      const loaded = loadSplits();
+      const loaded = loadSplits(null);
       expect(loaded).toHaveLength(1);
       expect(loaded[0].category).toBe('Restaurant');
     });
@@ -114,7 +114,7 @@ describe('storage', () => {
 
       localStorageMock.setItem('receiptsplit:splits', JSON.stringify(splits));
 
-      const loaded = loadSplits();
+      const loaded = loadSplits(null);
       expect(loaded).toHaveLength(3);
       expect(loaded[0].category).toBeUndefined();
       expect(loaded[1].category).toBe('Grocery');
@@ -122,14 +122,14 @@ describe('storage', () => {
     });
 
     it('should not crash on empty storage', () => {
-      const loaded = loadSplits();
+      const loaded = loadSplits(null);
       expect(loaded).toEqual([]);
     });
 
     it('should not crash on invalid JSON', () => {
-      localStorageMock.setItem('receiptsplit:splits', 'invalid json');
+      localStorageMock.setItem('receiptsplit:splits:anonymous', 'invalid json');
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const loaded = loadSplits();
+      const loaded = loadSplits(null);
       expect(loaded).toEqual([]);
       consoleSpy.mockRestore();
     });
@@ -150,8 +150,8 @@ describe('storage', () => {
         category: 'Restaurant',
       };
 
-      saveSplit(split);
-      const loaded = loadSplits();
+      saveSplit(split, null);
+      const loaded = loadSplits(null);
       expect(loaded).toHaveLength(1);
       expect(loaded[0].category).toBe('Restaurant');
     });

@@ -10,6 +10,7 @@ import { Split, Participant } from '@/types/split';
 import { generateId } from '@/utils/formatting';
 import { getFriends, getFriendByName, addFriend, type Friend } from '@/utils/friends';
 import { getRecentPeople, recordRecentPerson } from '@/utils/recentPeople';
+import { useAuthUserId } from '@/contexts/AuthContext';
 
 interface PeopleScreenProps {
   split: Split;
@@ -38,6 +39,7 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
+  const userId = useAuthUserId();
   
   // Get current participant IDs (for exclusion)
   const currentParticipantIds = new Set(split.participants.map(p => p.id));
@@ -45,9 +47,9 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
     split.participants.map(p => p.name.toLowerCase())
   );
   
-  // Get data sources
-  const savedFriends = getFriends();
-  const recentPeople = getRecentPeople();
+  // Get data sources (user-scoped)
+  const savedFriends = getFriends(userId);
+  const recentPeople = getRecentPeople(userId);
   
   // Filter out already-added participants
   const availableFriends = savedFriends.filter(f => !currentParticipantIds.has(f.id));
@@ -91,7 +93,7 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
     recentContains.forEach(n => result.push({ type: 'recent', name: n }));
     
     // Check if typed value exactly matches a saved friend
-    const exactMatch = getFriendByName(newName.trim());
+    const exactMatch = getFriendByName(newName.trim(), userId);
     const typedLower = newName.trim().toLowerCase();
     const hasExactFriendMatch = exactMatch && exactMatch.name.toLowerCase() === typedLower;
     
@@ -106,7 +108,7 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
     }
     
     return result;
-  }, [newName, availableFriends, availableRecent]);
+  }, [newName, availableFriends, availableRecent, userId]);
   
   // Calculate dropdown position based on input's boundingClientRect
   const updateDropdownPosition = () => {
@@ -229,7 +231,7 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
     });
     
     // Record as recent person
-    recordRecentPerson(participant.name);
+    recordRecentPerson(participant.name, userId);
     
     setNewName('');
     setShowSuggestions(false);
@@ -253,7 +255,7 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
     if (!trimmed) return;
     
     // Add to friends storage
-    const friend = addFriend(trimmed);
+    const friend = addFriend(trimmed, userId);
     
     // Add as participant
     const participant: Participant = {
@@ -289,7 +291,7 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
   
   const handleNext = () => {
     // Record all participants as recent
-    split.participants.forEach(p => recordRecentPerson(p.name));
+    split.participants.forEach(p => recordRecentPerson(p.name, userId));
     onNext();
   };
   
