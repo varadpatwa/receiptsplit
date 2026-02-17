@@ -296,6 +296,10 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
   };
   
   const deleteParticipant = (participantId: string) => {
+    // Prevent deletion of "me" - use excludeMe toggle in Receipt screen instead
+    if (participantId === 'me') {
+      return;
+    }
     onUpdate({
       ...split,
       participants: split.participants.filter(p => p.id !== participantId),
@@ -467,19 +471,25 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
                     </div>
                     <div className="flex flex-col">
                       <span className="font-medium text-white">{participant.name}</span>
-                      {participant.source && (
+                      {participant.id === 'me' ? (
+                        <span className="text-xs text-white/50">
+                          Use "Exclude me" toggle in Receipt screen to remove
+                        </span>
+                      ) : participant.source ? (
                         <span className="text-xs text-white/50">
                           {participant.source === 'friend' ? 'Saved friend' : 'Temp'}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
-                  <button
-                    onClick={() => deleteParticipant(participant.id)}
-                    className="rounded-lg p-2 text-white/60 transition-colors hover:bg-red-500/20 hover:text-red-400"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
+                  {participant.id !== 'me' && (
+                    <button
+                      onClick={() => deleteParticipant(participant.id)}
+                      className="rounded-lg p-2 text-white/60 transition-colors hover:bg-red-500/20 hover:text-red-400"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

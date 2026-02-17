@@ -30,6 +30,7 @@ export interface Split {
   tipInCents: number;
   currentStep: 'receipt' | 'people' | 'assign' | 'summary' | 'export';
   category?: SplitCategory;
+  excludeMe?: boolean; // Default false. When false, "me" participant is included.
 }
 
 export interface ParticipantBreakdown {

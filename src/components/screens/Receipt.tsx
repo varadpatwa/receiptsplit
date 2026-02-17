@@ -5,6 +5,7 @@ import { Stepper } from '@/components/Stepper';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
+import { Switch } from '@/components/ui/switch';
 import { Split, Item, SplitCategory } from '@/types/split';
 import { generateId, formatCurrency, isValidMoneyInput, moneyStringToCents, centsToMoneyString } from '@/utils/formatting';
 import {
@@ -226,6 +227,34 @@ export const ReceiptScreen: React.FC<ReceiptScreenProps> = ({
               Please select a category to continue
             </p>
           )}
+        </Card>
+        
+        {/* Exclude Me Toggle */}
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h3 className="font-semibold text-white">Exclude me from this split</h3>
+              <p className="mt-1 text-sm text-white/60">
+                {split.excludeMe
+                  ? "You won't be included in this split and it won't count toward your spending."
+                  : "You're included by default and this split will count toward your spending."}
+              </p>
+            </div>
+            <Switch
+              checked={split.excludeMe ?? false}
+              onCheckedChange={(checked) => {
+                const updated = { ...split, excludeMe: checked };
+                // Normalize participants: add/remove "me" based on excludeMe
+                const hasMe = updated.participants.some(p => p.id === 'me');
+                if (!checked && !hasMe) {
+                  updated.participants = [{ id: 'me', name: 'Me' }, ...updated.participants];
+                } else if (checked && hasMe) {
+                  updated.participants = updated.participants.filter(p => p.id !== 'me');
+                }
+                onUpdate(updated);
+              }}
+            />
+          </div>
         </Card>
         
         {/* Items */}

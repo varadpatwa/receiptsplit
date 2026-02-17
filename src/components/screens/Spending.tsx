@@ -5,7 +5,7 @@ import { formatCurrency } from '@/utils/formatting';
 import { useSplits } from '@/hooks/useSplits';
 import {
   getSplitsThisMonth,
-  getTotalSpendingCents,
+  getUserSpendingCents,
   getCategoryTotals,
   type CategoryTotal,
 } from '@/utils/spendingAggregation';
@@ -85,7 +85,7 @@ export const SpendingScreen: React.FC = () => {
 
   const { totalCents, categoryTotals } = useMemo(() => {
     const thisMonth = getSplitsThisMonth(splits);
-    const total = getTotalSpendingCents(thisMonth);
+    const total = getUserSpendingCents(thisMonth); // User's share, not total receipt
     const byCategory = getCategoryTotals(thisMonth);
     return {
       totalCents: total,
@@ -103,7 +103,7 @@ export const SpendingScreen: React.FC = () => {
             Spending
           </h1>
           <p className="text-white/60">
-            Total = sum of split totals · This month
+            Your share of this month's splits
           </p>
         </div>
 

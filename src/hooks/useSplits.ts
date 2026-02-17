@@ -25,10 +25,11 @@ export const useSplits = () => {
       createdAt: Date.now(),
       updatedAt: Date.now(),
       items: [],
-      participants: [],
+      participants: [{ id: 'me', name: 'Me' }], // "Me" included by default
       taxInCents: 0,
       tipInCents: 0,
-      currentStep: 'receipt'
+      currentStep: 'receipt',
+      excludeMe: false, // Default: include "me"
       // category is intentionally undefined - user must select
     };
     

@@ -8,6 +8,9 @@ function getStorageKey(userId: string | null): string {
   return `${STORAGE_KEY_PREFIX}:${userId ?? 'anonymous'}`;
 }
 
+const ME_PARTICIPANT_ID = 'me';
+const ME_PARTICIPANT_NAME = 'Me';
+
 /**
  * Migrate old participant data to new format with IDs
  */
@@ -37,6 +40,33 @@ function migrateParticipant(p: unknown): Participant {
 }
 
 /**
+ * Normalize split: ensure excludeMe is set (default false), and "me" participant exists/doesn't exist accordingly.
+ */
+function normalizeSplit(split: Split): Split {
+  const excludeMe = split.excludeMe ?? false;
+  const hasMe = split.participants.some(p => p.id === ME_PARTICIPANT_ID);
+  
+  let participants = [...split.participants];
+  
+  if (!excludeMe && !hasMe) {
+    // Add "me" participant
+    participants = [
+      { id: ME_PARTICIPANT_ID, name: ME_PARTICIPANT_NAME },
+      ...participants,
+    ];
+  } else if (excludeMe && hasMe) {
+    // Remove "me" participant
+    participants = participants.filter(p => p.id !== ME_PARTICIPANT_ID);
+  }
+  
+  return {
+    ...split,
+    excludeMe,
+    participants,
+  };
+}
+
+/**
  * Load splits for the given user. userId = null means anonymous (signed out).
  * Migrates legacy key receiptsplit:splits to receiptsplit:splits:anonymous once.
  */
@@ -55,24 +85,26 @@ export const loadSplits = (userId: string | null): Split[] => {
     if (!stored) return [];
     const splits = JSON.parse(stored) as Split[];
     
-    // Migrate participants if needed
+    // Migrate participants and normalize "me" participant
     return splits.map(split => {
-      if (!Array.isArray(split.participants)) {
-        return split;
+      let normalized = split;
+      
+      // Migrate participants if needed
+      if (Array.isArray(split.participants)) {
+        const needsMigration = split.participants.some(
+          p => typeof p === 'string' || !('id' in p)
+        );
+        
+        if (needsMigration) {
+          normalized = {
+            ...split,
+            participants: split.participants.map(migrateParticipant),
+          };
+        }
       }
       
-      const needsMigration = split.participants.some(
-        p => typeof p === 'string' || !('id' in p)
-      );
-      
-      if (!needsMigration) {
-        return split;
-      }
-      
-      return {
-        ...split,
-        participants: split.participants.map(migrateParticipant),
-      };
+      // Normalize excludeMe and "me" participant
+      return normalizeSplit(normalized);
     });
   } catch (error) {
     console.error('Failed to load splits:', error);
@@ -89,13 +121,14 @@ export const saveSplits = (splits: Split[], userId: string | null): void => {
 };
 
 export const saveSplit = (split: Split, userId: string | null): void => {
+  const normalized = normalizeSplit(split);
   const splits = loadSplits(userId);
-  const index = splits.findIndex(s => s.id === split.id);
+  const index = splits.findIndex(s => s.id === normalized.id);
   
   if (index >= 0) {
-    splits[index] = { ...split, updatedAt: Date.now() };
+    splits[index] = { ...normalized, updatedAt: Date.now() };
   } else {
-    splits.push(split);
+    splits.push({ ...normalized, updatedAt: Date.now() });
   }
   
   saveSplits(splits, userId);

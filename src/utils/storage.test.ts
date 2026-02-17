@@ -156,4 +156,76 @@ describe('storage', () => {
       expect(loaded[0].category).toBe('Restaurant');
     });
   });
+
+  describe('excludeMe normalization', () => {
+    it('should include "me" participant when excludeMe=false (default)', () => {
+      const split: Split = {
+        id: 'test-exclude-false',
+        name: 'Test Split',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        items: [],
+        participants: [],
+        taxInCents: 0,
+        tipInCents: 0,
+        currentStep: 'receipt',
+        excludeMe: false,
+      };
+
+      saveSplit(split, null);
+      const loaded = loadSplits(null);
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].excludeMe).toBe(false);
+      expect(loaded[0].participants).toHaveLength(1);
+      expect(loaded[0].participants[0].id).toBe('me');
+      expect(loaded[0].participants[0].name).toBe('Me');
+    });
+
+    it('should remove "me" participant when excludeMe=true', () => {
+      const split: Split = {
+        id: 'test-exclude-true',
+        name: 'Test Split',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        items: [],
+        participants: [{ id: 'me', name: 'Me' }, { id: 'other', name: 'Other' }],
+        taxInCents: 0,
+        tipInCents: 0,
+        currentStep: 'receipt',
+        excludeMe: true,
+      };
+
+      saveSplit(split, null);
+      const loaded = loadSplits(null);
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].excludeMe).toBe(true);
+      expect(loaded[0].participants).toHaveLength(1);
+      expect(loaded[0].participants[0].id).toBe('other');
+      expect(loaded[0].participants.some(p => p.id === 'me')).toBe(false);
+    });
+
+    it('should migrate legacy splits: set excludeMe=false and add "me" participant', () => {
+      const legacySplit: Split = {
+        id: 'test-legacy',
+        name: 'Legacy Split',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        items: [],
+        participants: [{ id: 'other', name: 'Other' }],
+        taxInCents: 0,
+        tipInCents: 0,
+        currentStep: 'receipt',
+        // excludeMe is missing
+      };
+
+      localStorageMock.setItem('receiptsplit:splits:anonymous', JSON.stringify([legacySplit]));
+
+      const loaded = loadSplits(null);
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].excludeMe).toBe(false);
+      expect(loaded[0].participants).toHaveLength(2);
+      expect(loaded[0].participants.some(p => p.id === 'me' && p.name === 'Me')).toBe(true);
+      expect(loaded[0].participants.some(p => p.id === 'other')).toBe(true);
+    });
+  });
 });
