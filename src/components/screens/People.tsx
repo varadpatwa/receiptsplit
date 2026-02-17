@@ -8,7 +8,7 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { Split, Participant } from '@/types/split';
 import { generateId } from '@/utils/formatting';
-import { listFriends, createFriend, type Friend } from '@/lib/friends';
+import { listFriends, getFriendByHandle, type Friend } from '@/lib/friends';
 import { getRecentPeople, recordRecentPerson } from '@/utils/recentPeople';
 import { useAuthUserId } from '@/contexts/AuthContext';
 
@@ -86,10 +86,12 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
     const friendPrefix: Friend[] = [];
     const friendContains: Friend[] = [];
     availableFriends.forEach(friend => {
-      const lower = friend.name.toLowerCase();
-      if (lower.startsWith(query)) {
+      const handleLower = friend.handle.toLowerCase();
+      const displayLower = friend.display_name?.toLowerCase() || '';
+      const searchText = handleLower + ' ' + displayLower;
+      if (handleLower.startsWith(query) || displayLower.startsWith(query)) {
         friendPrefix.push(friend);
-      } else if (lower.includes(query)) {
+      } else if (searchText.includes(query)) {
         friendContains.push(friend);
       }
     });
@@ -110,9 +112,9 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
     recentPrefix.forEach(n => result.push({ type: 'recent', name: n }));
     recentContains.forEach(n => result.push({ type: 'recent', name: n }));
     
-    // Check if typed value exactly matches a saved friend
+    // Check if typed value exactly matches a saved friend (by handle)
     const typedLower = newName.trim().toLowerCase();
-    const exactMatch = savedFriends.find(f => f.name.toLowerCase() === typedLower);
+    const exactMatch = savedFriends.find(f => f.handle.toLowerCase() === typedLower);
     const hasExactFriendMatch = !!exactMatch;
     
     // Always show "Add as Temp" if there's typed text (allows duplicate names)
@@ -273,24 +275,24 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
     if (!trimmed || !userId) return;
     
     try {
-      // Add to friends in Supabase
-      const friend = await createFriend(trimmed);
+      // Try to find friend by handle
+      const friend = await getFriendByHandle(trimmed);
       
-      // Update local friends list
-      const updated = await listFriends();
-      setSavedFriends(updated);
-      
-      // Add as participant
-      const participant: Participant = {
-        id: friend.id, // Use friend's stable ID
-        name: friend.name,
-        source: 'friend'
-      };
-      
-      addParticipant(participant);
+      if (friend) {
+        // Add as participant using friend's data
+        const participant: Participant = {
+          id: friend.id, // Use friend's user_id
+          name: friend.display_name || friend.handle,
+          source: 'friend'
+        };
+        addParticipant(participant);
+      } else {
+        // Not a friend, add as temp
+        addParticipantAsTemp(trimmed);
+      }
     } catch (error) {
-      console.error('Failed to add friend:', error);
-      // Still add as temp participant if friend creation fails
+      console.error('Failed to find friend:', error);
+      // Still add as temp participant if lookup fails
       addParticipantAsTemp(trimmed);
     }
   };
@@ -300,7 +302,7 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
       case 'friend':
         const participant: Participant = {
           id: suggestion.friend.id,
-          name: suggestion.friend.name,
+          name: suggestion.friend.display_name || suggestion.friend.handle,
           source: 'friend'
         };
         addParticipant(participant);
@@ -411,12 +413,12 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
                 let badgeText = '';
                 let badgeColor = '';
                 
-                switch (suggestion.type) {
-                  case 'friend':
-                    displayText = suggestion.friend.name;
-                    badgeText = 'Saved';
-                    badgeColor = 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-                    break;
+                    switch (suggestion.type) {
+                      case 'friend':
+                        displayText = suggestion.friend.display_name || suggestion.friend.handle;
+                        badgeText = '@' + suggestion.friend.handle;
+                        badgeColor = 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+                        break;
                   case 'recent':
                     displayText = suggestion.name;
                     badgeText = 'Recent';
@@ -426,10 +428,10 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
                     displayText = `Add "${suggestion.name}" as Temp`;
                     badgeText = '';
                     break;
-                  case 'add-friend':
-                    displayText = `Add "${suggestion.name}" as Friend`;
-                    badgeText = '';
-                    break;
+                      case 'add-friend':
+                        displayText = `Add "${suggestion.name}" as Temp`;
+                        badgeText = '';
+                        break;
                 }
                 
                 return (

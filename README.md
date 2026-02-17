@@ -149,6 +149,47 @@ The `/app/items` page uses Supabase table `public.items` with RLS. Routes:
 - [ ] **Log into account B and confirm you cannot see A’s items**: Sign out, sign in as user B, go to `/app/items`. List should be empty or only show B’s items (no A’s items).
 - [ ] **Try inserting with a fake `user_id` (should fail)**: The client never sends `user_id`; `createItem` uses only the current session’s `user_id`. If you bypass the app and call the API with a fake `user_id`, RLS should block it (or the insert uses server-side auth.uid() only).
 
+## Usernames and Friend Requests
+
+The app uses handles/usernames for user discovery and cross-user friend requests via Supabase.
+
+### Schema Requirements
+
+- `public.profiles(id=auth.user.id, handle unique not null, display_name)`
+- `public.friend_requests(id, from_user_id, to_user_id, status pending/accepted/rejected)`
+- `public.friendships(user_id, friend_id)` (bidirectional)
+- RPC: `public.accept_friend_request(req_id uuid)`
+
+### Manual Test Checklist
+
+#### Onboarding
+- [ ] **User A signs up**: After signup/login, user A is redirected to `/onboarding/username`
+- [ ] **User A sets handle**: Enter handle (e.g., `alice123`), validation works (3-20 chars, lowercase/numbers/underscore)
+- [ ] **Handle uniqueness**: Try to use an existing handle, see error "This handle is already taken"
+- [ ] **User A completes onboarding**: After setting handle, redirected to main app (`/app`)
+
+#### Profile Management
+- [ ] **User A views profile**: Go to Account screen, see handle and display name
+- [ ] **User A edits display name**: Change display name, save successfully
+- [ ] **User A changes handle**: Change handle (with uniqueness check), save successfully
+
+#### Friend Requests
+- [ ] **User B signs up**: User B sets handle (e.g., `bob456`)
+- [ ] **User A searches for User B**: In Friends screen, search by handle prefix (e.g., `bob`), see User B in results
+- [ ] **User A sends request**: Click "Send request" for User B
+- [ ] **User B sees incoming request**: User B's Friends screen shows incoming request from User A
+- [ ] **User B accepts request**: User B clicks accept, both users now see each other in Friends list
+- [ ] **User A cannot see random requests**: User A only sees requests they sent or received (not other users' requests)
+
+#### Friends List
+- [ ] **Friends appear correctly**: Both users see each other with handle and display name
+- [ ] **Remove friend**: User A removes User B, both users no longer see each other in friends list
+
+#### Data Isolation
+- [ ] **User C signs up**: User C sets handle, cannot see User A or User B's friend requests
+- [ ] **User C searches**: Can find User A and User B by handle, can send requests
+- [ ] **User C's requests are private**: User A and User B cannot see User C's requests unless involved
+
 ## License
 
 MIT

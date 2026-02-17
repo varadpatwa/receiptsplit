@@ -1,10 +1,7 @@
 import { supabase } from './supabaseClient';
 import { Split } from '@/types/split';
-import { Friend } from '@/utils/friends';
 import { loadSplits } from '@/utils/storage';
-import { getFriends } from '@/utils/friends';
 import { createSplit, updateSplit } from './splits';
-import { createFriend } from './friends';
 
 const MIGRATION_FLAG_PREFIX = 'receiptsplit:migrated';
 
@@ -69,25 +66,14 @@ async function migrateSplits(userId: string): Promise<number> {
 
 /**
  * Migrate friends from localStorage to Supabase
+ * NOTE: Friends migration is disabled - old localStorage friends were just names,
+ * not user accounts. The new system requires friend requests between actual users.
+ * Users will need to re-add friends through the friend request system.
  */
 async function migrateFriends(userId: string): Promise<number> {
-  const localFriends = getFriends(userId);
-  if (localFriends.length === 0) return 0;
-  
-  let migratedCount = 0;
-  
-  for (const friend of localFriends) {
-    try {
-      // createFriend handles duplicates, so this is safe
-      await createFriend(friend.name);
-      migratedCount++;
-    } catch (error) {
-      console.error(`Failed to migrate friend ${friend.id}:`, error);
-      // Continue with next friend
-    }
-  }
-  
-  return migratedCount;
+  // Friends migration disabled - old friends were names, not user accounts
+  // Users need to use the friend request system to add friends
+  return 0;
 }
 
 /**

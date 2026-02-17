@@ -1,123 +1,69 @@
 import { supabase } from './supabaseClient';
 
 export interface Friend {
-  id: string;
-  name: string;
-}
-
-/**
- * Convert database row to Friend
- */
-function rowToFriend(row: { id: string; name: string; created_at: string }): Friend {
-  return {
-    id: row.id,
-    name: row.name,
-  };
+  id: string; // friend's user_id
+  handle: string;
+  display_name: string | null;
 }
 
 /**
  * List all friends for the current user.
- * Requires an active session - user_id is derived from auth.uid() via RLS.
+ * Uses friendships table joined with profiles to get handle and display_name.
  */
 export async function listFriends(): Promise<Friend[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
   const { data, error } = await supabase
-    .from('friends')
-    .select('*')
-    .order('created_at', { ascending: false });
-  
+    .from('friendships')
+    .select(`
+      friend_id,
+      friend_profile:profiles!friendships_friend_id_fkey(handle, display_name)
+    `)
+    .eq('user_id', user.id);
+
   if (error) {
     console.error('Failed to list friends:', error);
     throw new Error(`Failed to load friends: ${error.message}`);
   }
-  
+
   if (!data) return [];
-  
-  return data.map(rowToFriend);
+
+  return data
+    .filter((row: any) => row.friend_profile)
+    .map((row: any) => ({
+      id: row.friend_id,
+      handle: row.friend_profile.handle,
+      display_name: row.friend_profile.display_name,
+    }));
 }
 
 /**
- * Create a new friend.
- * user_id is automatically set by RLS from auth.uid().
- * Trims whitespace and checks for duplicates case-insensitively.
- */
-export async function createFriend(name: string): Promise<Friend> {
-  const trimmed = name.trim();
-  if (!trimmed) {
-    throw new Error('Friend name cannot be empty');
-  }
-  
-  // Check for existing friend with same name (case-insensitive)
-  const existing = await listFriends();
-  const lower = trimmed.toLowerCase();
-  const duplicate = existing.find(f => f.name.toLowerCase() === lower);
-  if (duplicate) {
-    return duplicate;
-  }
-  
-  const { data, error } = await supabase
-    .from('friends')
-    .insert({
-      name: trimmed,
-    })
-    .select()
-    .single();
-  
-  if (error) {
-    console.error('Failed to create friend:', error);
-    throw new Error(`Failed to create friend: ${error.message}`);
-  }
-  
-  return rowToFriend(data);
-}
-
-/**
- * Update an existing friend.
- * Only updates friends owned by the current user (enforced by RLS).
- */
-export async function updateFriend(friend: Friend): Promise<Friend> {
-  const trimmed = friend.name.trim();
-  if (!trimmed) {
-    throw new Error('Friend name cannot be empty');
-  }
-  
-  const { data, error } = await supabase
-    .from('friends')
-    .update({
-      name: trimmed,
-    })
-    .eq('id', friend.id)
-    .select()
-    .single();
-  
-  if (error) {
-    console.error('Failed to update friend:', error);
-    throw new Error(`Failed to update friend: ${error.message}`);
-  }
-  
-  return rowToFriend(data);
-}
-
-/**
- * Delete a friend.
- * Only deletes friends owned by the current user (enforced by RLS).
+ * Remove a friendship (unfriend)
  */
 export async function deleteFriend(friendId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  // Delete both directions of the friendship
   const { error } = await supabase
-    .from('friends')
+    .from('friendships')
     .delete()
-    .eq('id', friendId);
-  
+    .or(`and(user_id.eq.${user.id},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${user.id})`);
+
   if (error) {
     console.error('Failed to delete friend:', error);
-    throw new Error(`Failed to delete friend: ${error.message}`);
+    throw new Error(`Failed to remove friend: ${error.message}`);
   }
 }
 
 /**
- * Get friend by name (case-insensitive). Returns undefined if not found.
+ * Get friend by handle (case-insensitive). Returns undefined if not found.
  */
-export async function getFriendByName(name: string): Promise<Friend | undefined> {
-  const trimmed = name.trim().toLowerCase();
+export async function getFriendByHandle(handle: string): Promise<Friend | undefined> {
+  const trimmed = handle.trim().toLowerCase();
   const friends = await listFriends();
-  return friends.find(f => f.name.toLowerCase() === trimmed);
+  return friends.find(f => f.handle.toLowerCase() === trimmed);
 }
