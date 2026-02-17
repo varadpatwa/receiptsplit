@@ -5,6 +5,7 @@ import { Card } from '@/components/Card';
 import { Input } from '@/components/Input';
 import { Button } from '@/components/Button';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
+import { AUTH_HOME, AUTH_LANDING } from '@/constants/routes';
 
 function toErrorString(e: unknown): string {
   if (typeof e === 'string' && e.trim()) return e.trim();
@@ -26,7 +27,7 @@ export const LoginScreen: React.FC = () => {
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate('/app/items', { replace: true });
+      if (session) navigate(AUTH_HOME, { replace: true });
     });
   }, [navigate]);
 
@@ -41,7 +42,7 @@ export const LoginScreen: React.FC = () => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) setError(toErrorString(error));
-      else navigate('/app/items', { replace: true });
+      else navigate(AUTH_HOME, { replace: true });
     } catch (err) {
       setError(toErrorString(err));
     } finally {

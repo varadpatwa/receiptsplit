@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card } from '@/components/Card';
 import { Input } from '@/components/Input';
@@ -8,6 +9,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
 import { listSplits } from '@/lib/splits';
 import { listFriends } from '@/lib/friends';
+import { AUTH_LANDING } from '@/constants/routes';
 
 /** Normalize any error to a user-facing string. Avoids showing "{}" or [object Object]. */
 function toErrorString(e: unknown): string {
@@ -23,6 +25,7 @@ function toErrorString(e: unknown): string {
 const SIGNUP_TIMEOUT_MS = 20_000;
 
 export const AccountScreen: React.FC = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [session, setSession] = useState<Session | null>(null);
@@ -111,7 +114,12 @@ export const AccountScreen: React.FC = () => {
     setError(null);
     try {
       const { error } = await supabase.auth.signOut();
-      if (error) setError(toErrorString(error));
+      if (error) {
+        setError(toErrorString(error));
+      } else {
+        // Navigate to welcome screen after sign out
+        navigate(AUTH_LANDING, { replace: true });
+      }
     } catch (err) {
       setError(toErrorString(err));
     } finally {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
+import { AUTH_HOME, AUTH_LANDING } from '@/constants/routes';
 
 /**
  * Handles redirect from Supabase email confirmation (e.g. Brevo SMTP).
@@ -30,7 +31,7 @@ export const AuthCallback: React.FC = () => {
             return;
           }
           if (data.session) {
-            navigate('/', { replace: true });
+            navigate(AUTH_HOME, { replace: true });
             return;
           }
         }
@@ -44,14 +45,14 @@ export const AuthCallback: React.FC = () => {
             setError(setError_.message);
             return;
           }
-          navigate('/', { replace: true });
+          navigate(AUTH_HOME, { replace: true });
           return;
         }
 
         // No tokens: maybe already restored by client
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          navigate('/', { replace: true });
+          navigate(AUTH_HOME, { replace: true });
           return;
         }
 
@@ -68,7 +69,7 @@ export const AuthCallback: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#0B0B0C] flex flex-col items-center justify-center p-6">
         <p className="text-red-400 text-center mb-4">{error}</p>
-        <a href="/" className="text-white/80 underline">Return home</a>
+        <a href={AUTH_LANDING} className="text-white/80 underline">Return home</a>
       </div>
     );
   }

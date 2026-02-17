@@ -12,6 +12,7 @@ import {
   deleteItem,
   type ItemRow,
 } from '@/lib/items';
+import { AUTH_LANDING } from '@/constants/routes';
 import { Pencil, Trash2 } from 'lucide-react';
 
 export const ItemsScreen: React.FC = () => {
@@ -46,7 +47,7 @@ export const ItemsScreen: React.FC = () => {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
-        navigate('/login', { replace: true });
+        navigate(AUTH_LANDING, { replace: true });
         return;
       }
       setAuthChecked(true);
@@ -142,7 +143,7 @@ export const ItemsScreen: React.FC = () => {
             <h1 className="text-3xl font-semibold tracking-tight text-white">Items</h1>
             <p className="text-white/60">Manage your items.</p>
           </div>
-          <Button variant="secondary" onClick={() => supabase.auth.signOut().then(() => navigate('/login', { replace: true }))}>
+          <Button variant="secondary" onClick={() => supabase.auth.signOut().then(() => navigate('/', { replace: true }))}>
             Sign out
           </Button>
         </div>
