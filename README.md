@@ -136,6 +136,19 @@ npx tsc --noEmit
 - localStorage required
 - Native share API optional (fallback to clipboard)
 
+## App Items (Supabase + RLS)
+
+The `/app/items` page uses Supabase table `public.items` with RLS. Routes:
+
+- **`/login`** – Sign in (redirects to `/app/items` when already authenticated).
+- **`/app/items`** – List/add/edit/delete items (protected; redirects to `/login` if no session).
+
+### Manual verification checklist
+
+- [ ] **Create items with account A**: Sign in as user A, go to `/app/items`, add a few items. Confirm they appear.
+- [ ] **Log into account B and confirm you cannot see A’s items**: Sign out, sign in as user B, go to `/app/items`. List should be empty or only show B’s items (no A’s items).
+- [ ] **Try inserting with a fake `user_id` (should fail)**: The client never sends `user_id`; `createItem` uses only the current session’s `user_id`. If you bypass the app and call the API with a fake `user_id`, RLS should block it (or the insert uses server-side auth.uid() only).
+
 ## License
 
 MIT
