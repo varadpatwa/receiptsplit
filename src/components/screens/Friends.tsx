@@ -4,39 +4,84 @@ import { Layout } from '@/components/Layout';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
-import { getFriends, addFriend, removeFriend, type Friend } from '@/utils/friends';
+import { listFriends, createFriend, deleteFriend, type Friend } from '@/lib/friends';
 import { useAuthUserId } from '@/contexts/AuthContext';
+import { migrateUserData } from '@/lib/migration';
 
 function FriendsContent() {
   const userId = useAuthUserId();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [newName, setNewName] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    try {
-      setFriends(getFriends(userId));
-    } catch (e) {
-      setFriends([]);
-    }
+    const loadFriends = async () => {
+      if (!userId) {
+        setFriends([]);
+        return;
+      }
+      
+      setLoading(true);
+      try {
+        // Run migration if needed
+        await migrateUserData(userId);
+        
+        // Load friends from Supabase
+        const loaded = await listFriends();
+        setFriends(loaded);
+      } catch (e) {
+        console.error('Failed to load friends:', e);
+        setFriends([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadFriends();
   }, [userId]);
 
-  const handleAdd = () => {
-    if (!newName.trim()) return;
+  const handleAdd = async () => {
+    if (!newName.trim() || !userId) return;
+    
+    setLoading(true);
     try {
-      addFriend(newName.trim(), userId);
-      setFriends(getFriends(userId));
+      await createFriend(newName.trim());
+      const updated = await listFriends();
+      setFriends(updated);
       setNewName('');
     } catch (e) {
-      setFriends(getFriends(userId));
+      console.error('Failed to add friend:', e);
+      // Reload to get current state
+      try {
+        const updated = await listFriends();
+        setFriends(updated);
+      } catch {
+        // Ignore reload errors
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRemove = (id: string) => {
+  const handleRemove = async (id: string) => {
+    if (!userId) return;
+    
+    setLoading(true);
     try {
-      removeFriend(id, userId);
-      setFriends(getFriends(userId));
+      await deleteFriend(id);
+      const updated = await listFriends();
+      setFriends(updated);
     } catch (e) {
-      setFriends(getFriends(userId));
+      console.error('Failed to remove friend:', e);
+      // Reload to get current state
+      try {
+        const updated = await listFriends();
+        setFriends(updated);
+      } catch {
+        // Ignore reload errors
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -61,20 +106,30 @@ function FriendsContent() {
               placeholder="Friend's name"
               value={newName}
               onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAdd()}
+              onKeyDown={e => e.key === 'Enter' && !loading && handleAdd()}
+              disabled={loading || !userId}
               className="flex-1"
             />
-            <Button onClick={handleAdd} disabled={!newName.trim()}>
+            <Button onClick={handleAdd} disabled={!newName.trim() || loading || !userId}>
               <Plus className="h-5 w-5" />
             </Button>
           </div>
+          {!userId && (
+            <p className="text-sm text-white/60">
+              Sign in to add friends
+            </p>
+          )}
         </Card>
 
         <Card className="space-y-4">
           <h3 className="font-semibold text-white">Saved friends</h3>
-          {list.length === 0 ? (
+          {loading && list.length === 0 ? (
             <p className="py-6 text-center text-white/60">
-              No friends yet. Add one above.
+              Loading...
+            </p>
+          ) : list.length === 0 ? (
+            <p className="py-6 text-center text-white/60">
+              {userId ? 'No friends yet. Add one above.' : 'Sign in to see your friends'}
             </p>
           ) : (
             <div className="space-y-2">
@@ -87,7 +142,8 @@ function FriendsContent() {
                   <button
                     type="button"
                     onClick={() => handleRemove(friend.id)}
-                    className="rounded-lg p-2 text-white/60 transition-colors hover:bg-red-500/20 hover:text-red-400"
+                    disabled={loading}
+                    className="rounded-lg p-2 text-white/60 transition-colors hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50"
                     aria-label={`Remove ${friend.name}`}
                   >
                     <Trash2 className="h-5 w-5" />

@@ -8,7 +8,7 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { Split, Participant } from '@/types/split';
 import { generateId } from '@/utils/formatting';
-import { getFriends, getFriendByName, addFriend, type Friend } from '@/utils/friends';
+import { listFriends, createFriend, type Friend } from '@/lib/friends';
 import { getRecentPeople, recordRecentPerson } from '@/utils/recentPeople';
 import { useAuthUserId } from '@/contexts/AuthContext';
 
@@ -40,6 +40,25 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const userId = useAuthUserId();
+  const [savedFriends, setSavedFriends] = useState<Friend[]>([]);
+  
+  // Load friends from Supabase
+  useEffect(() => {
+    const loadFriends = async () => {
+      if (!userId) {
+        setSavedFriends([]);
+        return;
+      }
+      try {
+        const friends = await listFriends();
+        setSavedFriends(friends);
+      } catch (error) {
+        console.error('Failed to load friends:', error);
+        setSavedFriends([]);
+      }
+    };
+    loadFriends();
+  }, [userId]);
   
   // Get current participant IDs (for exclusion)
   const currentParticipantIds = new Set(split.participants.map(p => p.id));
@@ -48,7 +67,6 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
   );
   
   // Get data sources (user-scoped)
-  const savedFriends = getFriends(userId);
   const recentPeople = getRecentPeople(userId);
   
   // Filter out already-added participants
@@ -93,9 +111,9 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
     recentContains.forEach(n => result.push({ type: 'recent', name: n }));
     
     // Check if typed value exactly matches a saved friend
-    const exactMatch = getFriendByName(newName.trim(), userId);
     const typedLower = newName.trim().toLowerCase();
-    const hasExactFriendMatch = exactMatch && exactMatch.name.toLowerCase() === typedLower;
+    const exactMatch = savedFriends.find(f => f.name.toLowerCase() === typedLower);
+    const hasExactFriendMatch = !!exactMatch;
     
     // Always show "Add as Temp" if there's typed text (allows duplicate names)
     if (newName.trim()) {
@@ -108,7 +126,7 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
     }
     
     return result;
-  }, [newName, availableFriends, availableRecent, userId]);
+  }, [newName, availableFriends, availableRecent, savedFriends]);
   
   // Calculate dropdown position based on input's boundingClientRect
   const updateDropdownPosition = () => {
@@ -250,24 +268,34 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
     addParticipant(participant);
   };
   
-  const addParticipantAsFriend = (name: string) => {
+  const addParticipantAsFriend = async (name: string) => {
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed || !userId) return;
     
-    // Add to friends storage
-    const friend = addFriend(trimmed, userId);
-    
-    // Add as participant
-    const participant: Participant = {
-      id: friend.id, // Use friend's stable ID
-      name: friend.name,
-      source: 'friend'
-    };
-    
-    addParticipant(participant);
+    try {
+      // Add to friends in Supabase
+      const friend = await createFriend(trimmed);
+      
+      // Update local friends list
+      const updated = await listFriends();
+      setSavedFriends(updated);
+      
+      // Add as participant
+      const participant: Participant = {
+        id: friend.id, // Use friend's stable ID
+        name: friend.name,
+        source: 'friend'
+      };
+      
+      addParticipant(participant);
+    } catch (error) {
+      console.error('Failed to add friend:', error);
+      // Still add as temp participant if friend creation fails
+      addParticipantAsTemp(trimmed);
+    }
   };
   
-  const handleSuggestionSelect = (suggestion: SuggestionType) => {
+  const handleSuggestionSelect = async (suggestion: SuggestionType) => {
     switch (suggestion.type) {
       case 'friend':
         const participant: Participant = {
@@ -284,7 +312,7 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
         addParticipantAsTemp(suggestion.name);
         break;
       case 'add-friend':
-        addParticipantAsFriend(suggestion.name);
+        await addParticipantAsFriend(suggestion.name);
         break;
     }
   };

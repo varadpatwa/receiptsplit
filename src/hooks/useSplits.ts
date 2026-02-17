@@ -1,20 +1,46 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Split } from '@/types/split';
-import { loadSplits, saveSplit as saveSplitToStorage, deleteSplit as deleteSplitFromStorage } from '@/utils/storage';
 import { generateId } from '@/utils/formatting';
 import { useAuthUserId } from '@/contexts/AuthContext';
+import { listSplits, createSplit, updateSplit, deleteSplit as deleteSplitFromSupabase } from '@/lib/splits';
+import { migrateUserData } from '@/lib/migration';
 
 export const useSplits = () => {
   const userId = useAuthUserId();
   const [splits, setSplits] = useState<Split[]>([]);
   const [currentSplit, setCurrentSplit] = useState<Split | null>(null);
+  const [loading, setLoading] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Load splits when userId changes (SIGNED_IN / SIGNED_OUT)
   useEffect(() => {
-    const loaded = loadSplits(userId);
-    setSplits(loaded);
-    setCurrentSplit(null);
+    const loadData = async () => {
+      if (!userId) {
+        // Signed out - clear splits
+        setSplits([]);
+        setCurrentSplit(null);
+        return;
+      }
+      
+      setLoading(true);
+      try {
+        // Run migration if needed (one-time per user)
+        await migrateUserData(userId);
+        
+        // Load splits from Supabase
+        const loaded = await listSplits();
+        setSplits(loaded);
+        setCurrentSplit(null);
+      } catch (error) {
+        console.error('Failed to load splits:', error);
+        setSplits([]);
+        setCurrentSplit(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
   }, [userId]);
   
   // Create new split
@@ -46,7 +72,12 @@ export const useSplits = () => {
   }, [splits]);
   
   // Save current split with debounce
-  const saveSplit = useCallback((split: Split, immediate = false) => {
+  const saveSplit = useCallback(async (split: Split, immediate = false) => {
+    if (!userId) {
+      console.warn('Cannot save split: user not signed in');
+      return;
+    }
+    
     setCurrentSplit(split);
     
     // Clear existing timeout
@@ -54,34 +85,66 @@ export const useSplits = () => {
       clearTimeout(saveTimeoutRef.current);
     }
     
-    const doSave = () => {
-      saveSplitToStorage(split, userId);
-      setSplits(prev => {
-        const index = prev.findIndex(s => s.id === split.id);
-        if (index >= 0) {
-          const updated = [...prev];
-          updated[index] = split;
-          return updated;
-        }
-        return [...prev, split];
-      });
+    const doSave = async () => {
+      try {
+        const isNew = !splits.some(s => s.id === split.id);
+        const saved = isNew 
+          ? await createSplit(split)
+          : await updateSplit(split);
+        
+        setSplits(prev => {
+          const index = prev.findIndex(s => s.id === saved.id);
+          if (index >= 0) {
+            const updated = [...prev];
+            updated[index] = saved;
+            return updated;
+          }
+          return [...prev, saved];
+        });
+      } catch (error) {
+        console.error('Failed to save split:', error);
+        // Update local state anyway for optimistic UI
+        setSplits(prev => {
+          const index = prev.findIndex(s => s.id === split.id);
+          if (index >= 0) {
+            const updated = [...prev];
+            updated[index] = split;
+            return updated;
+          }
+          return [...prev, split];
+        });
+      }
     };
     
     if (immediate) {
-      doSave();
+      await doSave();
     } else {
       // Debounce for 300ms
       saveTimeoutRef.current = setTimeout(doSave, 300);
     }
-  }, [userId]);
+  }, [userId, splits]);
   
   // Delete split
-  const deleteSplit = useCallback((splitId: string) => {
-    deleteSplitFromStorage(splitId, userId);
-    setSplits(prev => prev.filter(s => s.id !== splitId));
+  const deleteSplit = useCallback(async (splitId: string) => {
+    if (!userId) {
+      console.warn('Cannot delete split: user not signed in');
+      return;
+    }
     
-    if (currentSplit?.id === splitId) {
-      setCurrentSplit(null);
+    try {
+      await deleteSplitFromSupabase(splitId);
+      setSplits(prev => prev.filter(s => s.id !== splitId));
+      
+      if (currentSplit?.id === splitId) {
+        setCurrentSplit(null);
+      }
+    } catch (error) {
+      console.error('Failed to delete split:', error);
+      // Optimistically remove from UI anyway
+      setSplits(prev => prev.filter(s => s.id !== splitId));
+      if (currentSplit?.id === splitId) {
+        setCurrentSplit(null);
+      }
     }
   }, [currentSplit, userId]);
   
@@ -101,6 +164,7 @@ export const useSplits = () => {
   return {
     splits,
     currentSplit,
+    loading,
     createNewSplit,
     loadSplit,
     saveSplit,

@@ -6,8 +6,8 @@ import { Button } from '@/components/Button';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import type { Session, User } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
-import { loadSplits } from '@/utils/storage';
-import { getFriends } from '@/utils/friends';
+import { listSplits } from '@/lib/splits';
+import { listFriends } from '@/lib/friends';
 
 /** Normalize any error to a user-facing string. Avoids showing "{}" or [object Object]. */
 function toErrorString(e: unknown): string {
@@ -121,8 +121,32 @@ export const AccountScreen: React.FC = () => {
 
   const hasEnvVars = isSupabaseConfigured();
   const auth = useAuth();
-  const splitsCount = loadSplits(auth.userId).length;
-  const friendsCount = getFriends(auth.userId).length;
+  const [splitsCount, setSplitsCount] = useState<number>(0);
+  const [friendsCount, setFriendsCount] = useState<number>(0);
+  
+  // Load counts from Supabase
+  useEffect(() => {
+    const loadCounts = async () => {
+      if (!auth.userId || !hasEnvVars) {
+        setSplitsCount(0);
+        setFriendsCount(0);
+        return;
+      }
+      
+      try {
+        const splits = await listSplits();
+        const friends = await listFriends();
+        setSplitsCount(splits.length);
+        setFriendsCount(friends.length);
+      } catch (error) {
+        console.error('Failed to load counts:', error);
+        setSplitsCount(0);
+        setFriendsCount(0);
+      }
+    };
+    
+    loadCounts();
+  }, [auth.userId, hasEnvVars]);
 
   return (
     <Layout>
