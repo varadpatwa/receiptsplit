@@ -5,7 +5,11 @@ import { generateId } from '@/utils/formatting';
 const ME_PARTICIPANT_ID = 'me';
 const ME_PARTICIPANT_NAME = 'Me';
 
-const DEBUG_SPLITS = typeof import.meta !== 'undefined' && (import.meta as any).env?.DEV && typeof (window as any)?.__DEBUG_SPLITS__ === 'true';
+const DEBUG_SPLITS =
+  typeof import.meta !== 'undefined' &&
+  (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true &&
+  typeof window !== 'undefined' &&
+  Boolean((window as { __DEBUG_SPLITS__?: boolean }).__DEBUG_SPLITS__);
 function debugLog(...args: unknown[]) {
   if (DEBUG_SPLITS) console.log('[splits]', ...args);
 }
