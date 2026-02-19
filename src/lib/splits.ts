@@ -5,6 +5,11 @@ import { generateId } from '@/utils/formatting';
 const ME_PARTICIPANT_ID = 'me';
 const ME_PARTICIPANT_NAME = 'Me';
 
+const DEBUG_SPLITS = typeof import.meta !== 'undefined' && (import.meta as any).env?.DEV && typeof (window as any)?.__DEBUG_SPLITS__ === 'true';
+function debugLog(...args: unknown[]) {
+  if (DEBUG_SPLITS) console.log('[splits]', ...args);
+}
+
 /**
  * Normalize split: ensure excludeMe is set (default false), and "me" participant exists/doesn't exist accordingly.
  * This matches the logic from storage.ts to maintain consistency.
@@ -34,11 +39,12 @@ function normalizeSplit(split: Split): Split {
 }
 
 /**
- * Calculate total from split items, tax, and tip
+ * Calculate total from split items, tax, and tip. Always returns a finite integer (cents).
  */
 function calculateTotal(split: Split): number {
-  const itemsTotal = split.items.reduce((sum, item) => sum + item.priceInCents * item.quantity, 0);
-  return itemsTotal + split.taxInCents + split.tipInCents;
+  const itemsTotal = split.items.reduce((sum, item) => sum + (Number(item.priceInCents) || 0) * (Number(item.quantity) || 0), 0);
+  const total = itemsTotal + (Number(split.taxInCents) || 0) + (Number(split.tipInCents) || 0);
+  return Number.isFinite(total) ? Math.round(total) : 0;
 }
 
 /**
@@ -62,13 +68,17 @@ function splitToRow(split: Split): {
   const normalized = normalizeSplit(split);
   const total = calculateTotal(normalized);
   
+  const title = normalized.name?.trim() || `Split ${new Date(normalized.createdAt).toLocaleDateString()}`;
+  const createdAt = Number(normalized.createdAt);
+  const created_at = Number.isFinite(createdAt) ? new Date(createdAt).toISOString() : new Date().toISOString();
+
   return {
     id: normalized.id,
-    title: normalized.name,
+    title,
     total,
-    exclude_me: normalized.excludeMe ?? false,
-    participants: normalized.participants,
-    created_at: new Date(normalized.createdAt).toISOString(),
+    exclude_me: Boolean(normalized.excludeMe),
+    participants: Array.isArray(normalized.participants) ? normalized.participants : [],
+    created_at,
     split_data: {
       items: normalized.items,
       taxInCents: normalized.taxInCents,
@@ -111,49 +121,95 @@ function rowToSplit(row: {
 
 /**
  * List all splits for the current user.
- * Requires an active session - user_id is derived from auth.uid() via RLS.
+ * Requires an active session - RLS filters by auth.uid() = user_id.
  */
 export async function listSplits(): Promise<Split[]> {
   const { data, error } = await supabase
     .from('splits')
     .select('*')
     .order('created_at', { ascending: false });
-  
+
+  if (DEBUG_SPLITS) {
+    debugLog('listSplits response', { rowCount: data?.length ?? 0, error: error?.message });
+  }
+
   if (error) {
     console.error('Failed to list splits:', error);
     throw new Error(`Failed to load splits: ${error.message}`);
   }
-  
+
   if (!data) return [];
-  
+
   return data.map(rowToSplit);
+}
+
+/** True if the error indicates split_data column is missing (table has only required columns). */
+function isSplitDataColumnMissing(error: { message?: string } | null): boolean {
+  const msg = (error?.message ?? '').toLowerCase();
+  return msg.includes('split_data') || msg.includes('schema cache');
 }
 
 /**
  * Create a new split.
- * user_id is automatically set by RLS from auth.uid().
+ * Inserts required columns: id, user_id, title, total, exclude_me, participants, created_at.
+ * If the table has split_data (jsonb), also sends items/tax/tip/category/currentStep; otherwise retries without it.
  */
 export async function createSplit(split: Split): Promise<Split> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('You must be signed in to create a split');
+  }
+
   const normalized = normalizeSplit(split);
   const row = splitToRow(normalized);
-  
-  const { data, error } = await supabase
-    .from('splits')
-    .insert(row)
-    .select()
-    .single();
-  
-  if (error) {
-    console.error('Failed to create split:', error);
-    throw new Error(`Failed to create split: ${error.message}`);
+
+  const payloadWithSplitData = {
+    id: row.id,
+    user_id: user.id,
+    title: row.title,
+    total: row.total,
+    exclude_me: row.exclude_me,
+    participants: row.participants,
+    created_at: row.created_at,
+    split_data: row.split_data,
+  };
+
+  const payloadRequiredOnly = {
+    id: row.id,
+    user_id: user.id,
+    title: row.title,
+    total: row.total,
+    exclude_me: row.exclude_me,
+    participants: row.participants,
+    created_at: row.created_at,
+  };
+
+  if (DEBUG_SPLITS) {
+    debugLog('createSplit payload', { id: row.id, title: row.title, total: row.total, user_id: user.id });
   }
-  
-  return rowToSplit(data);
+
+  let result = await supabase.from('splits').insert(payloadWithSplitData).select().single();
+
+  if (result.error && isSplitDataColumnMissing(result.error)) {
+    result = await supabase.from('splits').insert(payloadRequiredOnly).select().single();
+  }
+
+  if (DEBUG_SPLITS) {
+    debugLog('createSplit response', { data: result.data?.id, error: result.error?.message });
+  }
+
+  if (result.error) {
+    console.error('Failed to create split:', result.error);
+    throw new Error(`Failed to create split: ${result.error.message}`);
+  }
+
+  return rowToSplit(result.data);
 }
 
 /**
  * Update an existing split.
  * Only updates splits owned by the current user (enforced by RLS).
+ * If the table has no split_data column, updates only title, total, exclude_me, participants.
  */
 export async function updateSplit(split: Split): Promise<Split> {
   const normalized = normalizeSplit({
@@ -161,26 +217,52 @@ export async function updateSplit(split: Split): Promise<Split> {
     updatedAt: Date.now(),
   });
   const row = splitToRow(normalized);
-  
-  const { data, error } = await supabase
+
+  const updateWithSplitData = {
+    title: row.title,
+    total: row.total,
+    exclude_me: row.exclude_me,
+    participants: row.participants,
+    split_data: row.split_data,
+  };
+
+  const updateRequiredOnly = {
+    title: row.title,
+    total: row.total,
+    exclude_me: row.exclude_me,
+    participants: row.participants,
+  };
+
+  if (DEBUG_SPLITS) {
+    debugLog('updateSplit', { id: split.id, title: row.title, total: row.total });
+  }
+
+  let result = await supabase
     .from('splits')
-    .update({
-      title: row.title,
-      total: row.total,
-      exclude_me: row.exclude_me,
-      participants: row.participants,
-      split_data: row.split_data,
-    })
+    .update(updateWithSplitData)
     .eq('id', split.id)
     .select()
     .single();
-  
-  if (error) {
-    console.error('Failed to update split:', error);
-    throw new Error(`Failed to update split: ${error.message}`);
+
+  if (result.error && isSplitDataColumnMissing(result.error)) {
+    result = await supabase
+      .from('splits')
+      .update(updateRequiredOnly)
+      .eq('id', split.id)
+      .select()
+      .single();
   }
-  
-  return rowToSplit(data);
+
+  if (DEBUG_SPLITS) {
+    debugLog('updateSplit response', { data: result.data?.id, error: result.error?.message });
+  }
+
+  if (result.error) {
+    console.error('Failed to update split:', result.error);
+    throw new Error(`Failed to update split: ${result.error.message}`);
+  }
+
+  return rowToSplit(result.data);
 }
 
 /**

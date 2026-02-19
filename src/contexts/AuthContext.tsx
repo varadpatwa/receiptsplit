@@ -7,6 +7,8 @@ type AuthState = {
   user: User | null;
   userId: string | null;
   email: string | null;
+  /** True once getSession() has completed (avoids clearing data before session restores on refresh) */
+  sessionLoaded: boolean;
 };
 
 const AuthContext = createContext<AuthState>({
@@ -14,6 +16,7 @@ const AuthContext = createContext<AuthState>({
   user: null,
   userId: null,
   email: null,
+  sessionLoaded: false,
 });
 
 export function useAuth() {
@@ -27,11 +30,13 @@ export function useAuthUserId(): string | null {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       setUser(s?.user ?? null);
+      setSessionLoaded(true);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
@@ -48,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     userId: user?.id ?? null,
     email: user?.email ?? null,
+    sessionLoaded,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

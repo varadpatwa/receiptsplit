@@ -7,6 +7,7 @@ import { Button } from '@/components/Button';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import type { Session, User } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSplits } from '@/hooks/useSplits';
 import { listSplits } from '@/lib/splits';
 import { listFriends } from '@/lib/friends';
 import { AUTH_LANDING } from '@/constants/routes';
@@ -140,7 +141,8 @@ export const AccountScreen: React.FC = () => {
 
   const hasEnvVars = isSupabaseConfigured();
   const auth = useAuth();
-  const [splitsCount, setSplitsCount] = useState<number>(0);
+  const { splits: inMemorySplits } = useSplits();
+  const [supabaseSplitsCount, setSupabaseSplitsCount] = useState<number | null>(null);
   const [friendsCount, setFriendsCount] = useState<number>(0);
   
   // Load profile
@@ -193,27 +195,27 @@ export const AccountScreen: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [newHandle, editingHandle, profile?.handle]);
   
-  // Load counts from Supabase
+  // Load counts from Supabase (for debug: Supabase vs in-memory)
   useEffect(() => {
     const loadCounts = async () => {
       if (!auth.userId || !hasEnvVars) {
-        setSplitsCount(0);
+        setSupabaseSplitsCount(null);
         setFriendsCount(0);
         return;
       }
-      
+
       try {
         const splits = await listSplits();
         const friends = await listFriends();
-        setSplitsCount(splits.length);
+        setSupabaseSplitsCount(splits.length);
         setFriendsCount(friends.length);
       } catch (error) {
         console.error('Failed to load counts:', error);
-        setSplitsCount(0);
+        setSupabaseSplitsCount(null);
         setFriendsCount(0);
       }
     };
-    
+
     loadCounts();
   }, [auth.userId, hasEnvVars]);
 
@@ -478,8 +480,12 @@ export const AccountScreen: React.FC = () => {
                 <span className="text-white/90 break-all">{auth.email ?? '—'}</span>
               </div>
               <div>
-                <span className="text-white/80">Splits count:</span>{' '}
-                <span className="text-white/90">{splitsCount}</span>
+                <span className="text-white/80">Supabase splits count:</span>{' '}
+                <span className="text-white/90">{supabaseSplitsCount ?? '—'}</span>
+              </div>
+              <div>
+                <span className="text-white/80">In-memory splits count:</span>{' '}
+                <span className="text-white/90">{inMemorySplits.length}</span>
               </div>
               <div>
                 <span className="text-white/80">Friends count:</span>{' '}

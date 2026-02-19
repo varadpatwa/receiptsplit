@@ -428,10 +428,10 @@ export const PeopleScreen: React.FC<PeopleScreenProps> = ({
                     displayText = `Add "${suggestion.name}" as Temp`;
                     badgeText = '';
                     break;
-                      case 'add-friend':
-                        displayText = `Add "${suggestion.name}" as Temp`;
-                        badgeText = '';
-                        break;
+                  case 'add-friend':
+                    displayText = `Add "${suggestion.name}" as Friend`;
+                    badgeText = '';
+                    break;
                 }
                 
                 return (

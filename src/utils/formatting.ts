@@ -79,6 +79,16 @@ export const generateId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
 
+/** Generate a UUID v4 for use as primary key where the DB column is type uuid (e.g. public.splits.id). */
+export const generateUuid = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  const hex = (n: number) => Math.floor(n).toString(16).padStart(2, '0');
+  const r = () => (Math.random() * 16) | 0;
+  return `${hex(r() * 0x10000)}${hex(r() * 0x10000)}-${hex(r() * 0x10000)}-4${hex(r() * 0x1000)}-${hex((r() & 0x3) | 0x8)}${hex(r() * 0x1000)}-${hex(r() * 0x10000)}${hex(r() * 0x10000)}${hex(r() * 0x10000)}`;
+};
+
 export const formatDate = (timestamp: number): string => {
   const date = new Date(timestamp);
   const today = new Date();

@@ -19,6 +19,8 @@ function App() {
   const {
     splits,
     currentSplit,
+    saveError,
+    clearSaveError,
     createNewSplit,
     loadSplit,
     saveSplit,
@@ -50,10 +52,10 @@ function App() {
   
   const navigateToStep = (step: Screen) => {
     if (currentSplit) {
-      updateCurrentSplit(split => ({
-        ...split,
-        currentStep: step as any
-      }));
+      updateCurrentSplit(
+        split => ({ ...split, currentStep: step as any }),
+        true
+      );
     }
     setCurrentScreen(step);
   };
@@ -168,6 +170,18 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#0B0B0C]" style={{ paddingBottom: TAB_BAR_HEIGHT }}>
+      {saveError && (
+        <div className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400">
+          <span>{saveError}</span>
+          <button
+            type="button"
+            onClick={clearSaveError}
+            className="rounded px-2 py-1 hover:bg-red-500/20"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       {renderHomeFlow()}
       <BottomTabBar activeTab={activeTab} onSelectTab={setActiveTab} />
     </div>
