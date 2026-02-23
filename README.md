@@ -1,6 +1,71 @@
 # ReceiptSplit
 
-A mobile-first web app that helps groups split restaurant bills in under 60 seconds with cent-perfect accuracy.
+A mobile-first web app that helps groups split restaurant bills in under 60 seconds with cent-perfect accuracy. This repo is a **monorepo** with a React (Vite) web app, an Expo React Native mobile app, and a shared TypeScript package.
+
+## Monorepo structure
+
+- **`apps/web`** – React (Vite) web app (existing app, unchanged behavior).
+- **`apps/mobile`** – Expo React Native app (auth, onboarding, Home/Spending/Friends/Account).
+- **`packages/shared`** – Shared TypeScript types and pure logic (split types, validation, spending helpers). No DOM or browser APIs.
+
+## How to run
+
+### Prerequisites
+
+- Node.js 18+
+- For mobile: Expo CLI (`npx expo`), iOS Simulator and/or Android emulator
+
+### Install (from repo root)
+
+```bash
+npm install
+```
+
+### Build shared package (required before web or mobile)
+
+```bash
+npm run build:shared
+# or: npm run build -w @receiptsplit/shared
+```
+
+### Web app
+
+```bash
+# Development
+npm run dev:web
+# or: npm run dev -w web
+
+# Production build
+npm run build:web
+# or: npm run build -w web
+```
+
+- **Env vars (web):** Create `apps/web/.env.local` with:
+  - `VITE_SUPABASE_URL` – your Supabase project URL
+  - `VITE_SUPABASE_ANON_KEY` – your Supabase anon key
+
+### Mobile app (Expo)
+
+```bash
+# Start Expo dev server
+npm run dev:mobile
+# or: npm run start -w mobile
+# or from apps/mobile: npx expo start
+```
+
+- **Env vars (mobile):** Create `apps/mobile/.env` (or use `eas env` / Expo env config) with:
+  - `EXPO_PUBLIC_SUPABASE_URL` – same Supabase project URL
+  - `EXPO_PUBLIC_SUPABASE_ANON_KEY` – same Supabase anon key
+
+Then open the app in iOS Simulator (`i` in terminal) or Android emulator (`a`), or scan the QR code with Expo Go.
+
+### Checklist
+
+- [ ] **Web still works:** From root, `npm run build:shared` then `npm run dev:web`. Web app loads; sign in, splits, friends, account work as before.
+- [ ] **Mobile launches:** From root, `npm run dev:mobile` (after `npm install` and building shared). App opens in simulator or device.
+- [ ] **Mobile sign up / login / onboarding:** Sign up with email, confirm if required, log in; if profile has no handle, complete Onboarding (handle + optional display name); then land on main tabs (Home, Spending, Friends, Account).
+- [ ] **Mobile Friends:** Search by handle, send request; accept/reject incoming; accept uses RPC; lists and remove friend work.
+- [ ] **Mobile Account:** Show/edit handle and display name; sign out returns to Welcome.
 
 ## Features
 
@@ -88,17 +153,21 @@ The calculation engine guarantees cent-perfect accuracy using integer arithmetic
 ## Development
 
 ```bash
-# Install dependencies
+# From repo root
 npm install
+npm run build:shared   # build shared package first
 
-# Start dev server
-npm run dev
+# Web
+npm run dev:web       # dev server
+npm run build:web     # production build
 
-# Build for production
-npm run build
+# Mobile
+npm run dev:mobile    # Expo start (then i for iOS, a for Android)
 
-# Type check
-npx tsc --noEmit
+# Type check (per app)
+cd apps/web && npx tsc --noEmit
+cd apps/mobile && npx tsc --noEmit
+cd packages/shared && npx tsc --noEmit
 ```
 
 ## Usage Flow
@@ -189,6 +258,12 @@ The app uses handles/usernames for user discovery and cross-user friend requests
 - [ ] **User C signs up**: User C sets handle, cannot see User A or User B's friend requests
 - [ ] **User C searches**: Can find User A and User B by handle, can send requests
 - [ ] **User C's requests are private**: User A and User B cannot see User C's requests unless involved
+
+## Known limitations / TODOs
+
+- **Mobile "New Split"**: Home tab shows "New Split" and recent splits from Supabase, but creating/editing a full split (receipt → people → assign → summary) is not implemented on mobile; use the web app for that flow.
+- **Mobile deep linking**: No custom scheme or universal links configured yet.
+- **Env for mobile**: Use `apps/mobile/.env` with `EXPO_PUBLIC_*` or Expo’s env support; ensure keys match web for same Supabase project.
 
 ## License
 

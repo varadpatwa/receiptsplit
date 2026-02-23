@@ -1,0 +1,33 @@
+{
+  "name": "mobile",
+  "version": "1.0.0",
+  "private": true,
+  "main": "AppEntry.js",
+  "scripts": {
+    "start": "node ../../node_modules/expo/bin/cli start",
+    "start:tunnel": "node ../../node_modules/expo/bin/cli start --tunnel",
+    "android": "node ../../node_modules/expo/bin/cli start --android",
+    "ios": "node ../../node_modules/expo/bin/cli start --ios",
+    "web": "node ../../node_modules/expo/bin/cli start --web"
+  },
+  "dependencies": {
+    "@receiptsplit/shared": "file:../../packages/shared",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-navigation/bottom-tabs": "^6.5.20",
+    "@react-navigation/native": "^6.1.18",
+    "@react-navigation/native-stack": "^6.9.26",
+    "@supabase/supabase-js": "^2.45.6",
+    "expo": "~54.0.0",
+    "expo-status-bar": "~2.0.0",
+    "react": "19.1.0",
+    "react-native": "0.81.0",
+    "react-native-safe-area-context": "4.14.0",
+    "react-native-screens": "4.4.0",
+    "react-native-url-polyfill": "^2.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@types/react": "~19.1.0",
+    "typescript": "~5.3.3"
+  }
+}

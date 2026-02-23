@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "ReceiptSplit",
+    "slug": "receiptsplit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "receiptsplit",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0B0C"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.receiptsplit.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0B0C"
+      },
+      "package": "com.receiptsplit.app"
+    }
+  }
+}
