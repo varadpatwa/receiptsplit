@@ -33,3 +33,9 @@ export async function deleteFriend(friendId: string): Promise<void> {
     .or(`and(user_id.eq.${user.id},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${user.id})`);
   if (error) throw new Error(`Failed to remove friend: ${error.message}`);
 }
+
+export async function getFriendByHandle(handle: string): Promise<Friend | undefined> {
+  const trimmed = handle.trim().toLowerCase();
+  const friends = await listFriends();
+  return friends.find((f) => f.handle.toLowerCase() === trimmed);
+}

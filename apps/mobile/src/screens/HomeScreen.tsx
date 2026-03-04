@@ -1,45 +1,62 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
-import { getReceiptTotal } from '@receiptsplit/shared';
-import { listSplits } from '../lib/splits';
+import React from 'react';
+import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { getReceiptTotal, formatCurrency } from '@receiptsplit/shared';
+import { useSplits } from '../contexts/SplitsContext';
+import type { Split } from '@receiptsplit/shared';
+import type { HomeStackParamList } from '../navigation/HomeStack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
 
 function formatDate(ts: number): string {
   const d = new Date(ts);
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function formatCurrency(cents: number): string {
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(cents / 100);
-}
+type Nav = NativeStackNavigationProp<HomeStackParamList, 'HomeList'>;
 
 export default function HomeScreen() {
-  const [splits, setSplits] = useState<Awaited<ReturnType<typeof listSplits>>>([]);
-  const [loading, setLoading] = useState(true);
+  const { splits, loading, createNewSplit, loadSplit, saveSplit, saveError, clearSaveError } = useSplits();
+  const navigation = useNavigation<Nav>();
 
-  const load = async () => {
-    try {
-      const data = await listSplits();
-      setSplits(data);
-    } catch {
-      setSplits([]);
-    } finally {
-      setLoading(false);
-    }
+  const onNewSplit = () => {
+    const newSplit = createNewSplit();
+    saveSplit(newSplit, true)
+      .then(() => navigation.navigate('Receipt'))
+      .catch(() => {});
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  const onSplitPress = (split: Split) => {
+    loadSplit(split.id);
+    const step = split.currentStep || 'receipt';
+    const screenName = step.charAt(0).toUpperCase() + step.slice(1) as keyof HomeStackParamList;
+    navigation.navigate(screenName);
+  };
 
   const sorted = [...splits].sort((a, b) => b.updatedAt - a.updatedAt);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>ReceiptSplit</Text>
-      <Text style={styles.subtitle}>Split bills in under 60 seconds</Text>
-      <TouchableOpacity style={styles.newSplitButton}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
+        {saveError ? (
+          <Pressable style={styles.errorBanner} onPress={clearSaveError}>
+            <Text style={styles.errorBannerText}>{saveError}</Text>
+            <Text style={styles.errorBannerDismiss}>Dismiss</Text>
+          </Pressable>
+        ) : null}
+        <Text style={styles.title}>ReceiptSplit</Text>
+        <Text style={styles.subtitle}>Split bills in under 60 seconds</Text>
+        <Pressable
+        style={({ pressed }) => [styles.newSplitButton, pressed && { opacity: 0.8 }]}
+        onPress={onNewSplit}
+        hitSlop={hitSlop}
+        accessibilityRole="button"
+        accessibilityLabel="New split"
+      >
         <Text style={styles.newSplitText}>New Split</Text>
-      </TouchableOpacity>
+      </Pressable>
       <Text style={styles.sectionTitle}>Recent Splits</Text>
       {loading ? (
         <Text style={styles.muted}>Loading...</Text>
@@ -53,7 +70,13 @@ export default function HomeScreen() {
           data={sorted}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <View style={styles.card}>
+            <Pressable
+              style={({ pressed }) => [styles.card, pressed && { opacity: 0.8 }]}
+              onPress={() => onSplitPress(item)}
+              hitSlop={hitSlop}
+              accessibilityRole="button"
+              accessibilityLabel={`Open split ${item.name}`}
+            >
               <View style={styles.cardRow}>
                 <View style={styles.cardLeft}>
                   <Text style={styles.cardName}>{item.name}</Text>
@@ -62,17 +85,19 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               </View>
-            </View>
+            </Pressable>
           )}
           style={styles.list}
         />
       )}
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0B0B0C', padding: 20, paddingTop: 16 },
+  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  container: { flex: 1, padding: 20, paddingTop: 16 },
   title: { fontSize: 28, fontWeight: '600', color: '#fff', marginBottom: 8 },
   subtitle: { color: 'rgba(255,255,255,0.6)', marginBottom: 24 },
   newSplitButton: {
@@ -106,4 +131,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: '#fff', marginBottom: 8 },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(239,68,68,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.3)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorBannerText: { flex: 1, color: '#fca5a5', fontSize: 14 },
+  errorBannerDismiss: { color: '#fca5a5', fontSize: 14, fontWeight: '600', marginLeft: 8 },
 });

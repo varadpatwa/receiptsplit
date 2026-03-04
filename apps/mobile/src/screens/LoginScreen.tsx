@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
+
+const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
 
 function toErrorString(e: unknown): string {
   if (typeof e === 'string' && e.trim()) return e.trim();
@@ -68,17 +70,19 @@ export default function LoginScreen() {
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
+          <Pressable
+            style={({ pressed }) => [styles.button, loading && styles.buttonDisabled, pressed && !loading && { opacity: 0.8 }]}
             onPress={handleSubmit}
             disabled={loading}
+            hitSlop={hitSlop}
+            accessibilityRole="button"
           >
             <Text style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign in'}</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
+        <Pressable onPress={() => navigation.navigate('Signup')} hitSlop={hitSlop}>
           <Text style={styles.link}>Don't have an account? Sign up</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
     </KeyboardAvoidingView>
   );

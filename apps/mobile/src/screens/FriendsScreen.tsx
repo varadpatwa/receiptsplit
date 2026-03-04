@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
 import { useAuth } from '../contexts/AuthContext';
 import { searchProfilesByHandle } from '../lib/supabase';
 import { listFriends, deleteFriend, type Friend } from '../lib/friends';
@@ -120,8 +123,9 @@ export default function FriendsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Friends</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Friends</Text>
       <Text style={styles.subtitle}>Find and connect with friends by handle.</Text>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Find friends</Text>
@@ -147,13 +151,14 @@ export default function FriendsScreen() {
                 ) : hasOutgoing(p.id) ? (
                   <Text style={styles.muted}>Request sent</Text>
                 ) : (
-                  <TouchableOpacity
-                    style={styles.smallButton}
+                  <Pressable
+                    style={({ pressed }) => [styles.smallButton, loading && styles.buttonDisabled, pressed && !loading && { opacity: 0.8 }]}
                     onPress={() => handleSendRequest(p.id)}
                     disabled={loading}
+                    hitSlop={hitSlop}
                   >
                     <Text style={styles.smallButtonText}>Send request</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 )}
               </View>
             ))}
@@ -172,12 +177,12 @@ export default function FriendsScreen() {
                 ) : null}
               </View>
               <View style={styles.row}>
-                <TouchableOpacity style={styles.iconButton} onPress={() => handleAccept(r.id)} disabled={loading}>
+                <Pressable style={({ pressed }) => [styles.iconButton, loading && styles.buttonDisabled, pressed && !loading && { opacity: 0.8 }]} onPress={() => handleAccept(r.id)} disabled={loading} hitSlop={hitSlop}>
                   <Text style={styles.iconButtonText}>Accept</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton} onPress={() => handleReject(r.id)} disabled={loading}>
+                </Pressable>
+                <Pressable style={({ pressed }) => [styles.iconButton, loading && styles.buttonDisabled, pressed && !loading && { opacity: 0.8 }]} onPress={() => handleReject(r.id)} disabled={loading} hitSlop={hitSlop}>
                   <Text style={styles.iconButtonText}>Reject</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
             </View>
           ))}
@@ -214,19 +219,21 @@ export default function FriendsScreen() {
                 <Text style={styles.handle}>@{f.handle}</Text>
                 {f.display_name ? <Text style={styles.muted}>{f.display_name}</Text> : null}
               </View>
-              <TouchableOpacity onPress={() => handleRemoveFriend(f.id)} disabled={loading}>
+              <Pressable onPress={() => handleRemoveFriend(f.id)} disabled={loading} hitSlop={hitSlop} style={({ pressed }) => pressed && !loading && { opacity: 0.8 }}>
                 <Text style={styles.removeText}>Remove</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           ))
         )}
       </View>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0B0B0C', padding: 20, paddingTop: 16, paddingBottom: 32 },
+  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  container: { flex: 1, padding: 20, paddingTop: 16, paddingBottom: 32 },
   title: { fontSize: 28, fontWeight: '600', color: '#fff', marginBottom: 8 },
   subtitle: { color: 'rgba(255,255,255,0.6)', marginBottom: 24 },
   card: {
@@ -272,5 +279,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   iconButtonText: { color: '#fff', fontSize: 14 },
+  buttonDisabled: { opacity: 0.6 },
   removeText: { color: '#f87171', fontSize: 14 },
 });

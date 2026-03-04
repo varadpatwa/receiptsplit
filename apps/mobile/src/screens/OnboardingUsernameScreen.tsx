@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable } from 'react-native';
 import { validateHandle } from '@receiptsplit/shared';
 import { upsertProfile, isHandleAvailable } from '../lib/supabase';
 import { useProfileRefresh } from '../contexts/ProfileRefreshContext';
@@ -93,13 +93,15 @@ export default function OnboardingUsernameScreen() {
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
-          <TouchableOpacity
-            style={[styles.button, (loading || !isValidFormat || checkingAvailability || !!error) && styles.buttonDisabled]}
+          <Pressable
+            style={({ pressed }) => [styles.button, (loading || !isValidFormat || checkingAvailability || !!error) && styles.buttonDisabled, pressed && !loading && { opacity: 0.8 }]}
             onPress={handleSubmit}
             disabled={loading || !isValidFormat || checkingAvailability || !!error}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityRole="button"
           >
             <Text style={styles.buttonText}>{loading ? 'Creating profile...' : 'Continue'}</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
     </View>

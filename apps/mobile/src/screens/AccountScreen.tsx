@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
 import { useAuth } from '../contexts/AuthContext';
 import { getProfile, upsertProfile, isHandleAvailable } from '../lib/supabase';
 import { validateHandle } from '@receiptsplit/shared';
@@ -89,16 +92,19 @@ export default function AccountScreen() {
 
   if (!session || !userId) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Account</Text>
-        <Text style={styles.muted}>Sign in to manage your account.</Text>
-      </View>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.container}>
+          <Text style={styles.title}>Account</Text>
+          <Text style={styles.muted}>Sign in to manage your account.</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Account</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Account</Text>
       <Text style={styles.subtitle}>Manage your profile.</Text>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Profile</Text>
@@ -116,24 +122,25 @@ export default function AccountScreen() {
               autoCapitalize="none"
             />
             <View style={styles.editActions}>
-              <TouchableOpacity
-                style={styles.smallButton}
+              <Pressable
+                style={({ pressed }) => [styles.smallButton, (saving || !validateHandle(newHandle).valid || newHandle === profile?.handle) && styles.buttonDisabled, pressed && !saving && { opacity: 0.8 }]}
                 onPress={handleSaveHandle}
                 disabled={saving || !validateHandle(newHandle).valid || newHandle === profile?.handle}
+                hitSlop={hitSlop}
               >
                 <Text style={styles.smallButtonText}>{saving ? 'Saving...' : 'Save'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.outlineButton} onPress={() => setEditingHandle(false)} disabled={saving}>
+              </Pressable>
+              <Pressable style={({ pressed }) => [styles.outlineButton, pressed && !saving && { opacity: 0.8 }]} onPress={() => setEditingHandle(false)} disabled={saving} hitSlop={hitSlop}>
                 <Text style={styles.outlineButtonText}>Cancel</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
         ) : (
           <View style={styles.row}>
             <Text style={styles.value}>@{profile?.handle ?? '—'}</Text>
-            <TouchableOpacity style={styles.outlineButton} onPress={() => setEditingHandle(true)}>
+            <Pressable style={({ pressed }) => [styles.outlineButton, pressed && { opacity: 0.8 }]} onPress={() => setEditingHandle(true)} hitSlop={hitSlop}>
               <Text style={styles.outlineButtonText}>Edit</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         )}
         <Text style={styles.label}>Display Name</Text>
@@ -148,20 +155,20 @@ export default function AccountScreen() {
               editable={!saving}
             />
             <View style={styles.editActions}>
-              <TouchableOpacity style={styles.smallButton} onPress={handleSaveDisplayName} disabled={saving}>
+              <Pressable style={({ pressed }) => [styles.smallButton, saving && styles.buttonDisabled, pressed && !saving && { opacity: 0.8 }]} onPress={handleSaveDisplayName} disabled={saving} hitSlop={hitSlop}>
                 <Text style={styles.smallButtonText}>{saving ? 'Saving...' : 'Save'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.outlineButton} onPress={() => setEditingDisplayName(false)} disabled={saving}>
+              </Pressable>
+              <Pressable style={({ pressed }) => [styles.outlineButton, pressed && !saving && { opacity: 0.8 }]} onPress={() => setEditingDisplayName(false)} disabled={saving} hitSlop={hitSlop}>
                 <Text style={styles.outlineButtonText}>Cancel</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
         ) : (
           <View style={styles.row}>
             <Text style={styles.value}>{profile?.display_name || '—'}</Text>
-            <TouchableOpacity style={styles.outlineButton} onPress={() => setEditingDisplayName(true)}>
+            <Pressable style={({ pressed }) => [styles.outlineButton, pressed && { opacity: 0.8 }]} onPress={() => setEditingDisplayName(true)} hitSlop={hitSlop}>
               <Text style={styles.outlineButtonText}>Edit</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         )}
         <Text style={styles.label}>Email</Text>
@@ -172,19 +179,24 @@ export default function AccountScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
-      <TouchableOpacity
-        style={[styles.logoutButton, logoutLoading && styles.buttonDisabled]}
+      <Pressable
+        style={({ pressed }) => [styles.logoutButton, logoutLoading && styles.buttonDisabled, pressed && !logoutLoading && { opacity: 0.8 }]}
         onPress={handleSignOut}
         disabled={logoutLoading}
+        hitSlop={hitSlop}
+        accessibilityRole="button"
+        accessibilityLabel="Sign out"
       >
         <Text style={styles.logoutButtonText}>{logoutLoading ? 'Signing out...' : 'Sign out'}</Text>
-      </TouchableOpacity>
-    </View>
+      </Pressable>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0B0B0C', padding: 20, paddingTop: 16, paddingBottom: 32 },
+  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  container: { flex: 1, padding: 20, paddingTop: 16, paddingBottom: 32 },
   title: { fontSize: 28, fontWeight: '600', color: '#fff', marginBottom: 8 },
   subtitle: { color: 'rgba(255,255,255,0.6)', marginBottom: 24 },
   muted: { color: 'rgba(255,255,255,0.6)', marginBottom: 24 },
