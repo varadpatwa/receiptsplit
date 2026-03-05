@@ -4,6 +4,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { useSplits } from '../contexts/SplitsContext';
 import HomeScreen from '../screens/HomeScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import SearchScreen from '../screens/SearchScreen';
 import { ReceiptScreen } from '../screens/split/ReceiptScreen';
 import { PeopleScreen } from '../screens/split/PeopleScreen';
 import { AssignScreen } from '../screens/split/AssignScreen';
@@ -12,6 +14,8 @@ import { ExportScreen } from '../screens/split/ExportScreen';
 
 export type HomeStackParamList = {
   HomeList: undefined;
+  Notifications: undefined;
+  Search: undefined;
   Receipt: undefined;
   People: undefined;
   Assign: undefined;
@@ -152,6 +156,8 @@ export default function HomeStack() {
       }}
     >
       <Stack.Screen name="HomeList" component={HomeScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="Search" component={SearchScreen} />
       <Stack.Screen name="Receipt" component={ReceiptConnector} />
       <Stack.Screen name="People" component={PeopleConnector} />
       <Stack.Screen name="Assign" component={AssignConnector} />

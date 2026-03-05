@@ -5,6 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { FriendRequestsProvider } from './src/contexts/FriendRequestsContext';
 import { ProfileRefreshProvider } from './src/contexts/ProfileRefreshContext';
 import { SplitsProvider } from './src/contexts/SplitsContext';
 import { getProfile } from './src/lib/supabase';
@@ -67,11 +68,13 @@ function AppNavigator() {
   }
 
   return (
-    <SplitsProvider>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Main" component={MainTabs} />
-      </Stack.Navigator>
-    </SplitsProvider>
+    <FriendRequestsProvider>
+      <SplitsProvider>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Main" component={MainTabs} />
+        </Stack.Navigator>
+      </SplitsProvider>
+    </FriendRequestsProvider>
   );
 }
 

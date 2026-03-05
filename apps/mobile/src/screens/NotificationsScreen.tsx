@@ -1,0 +1,283 @@
+import React, { useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  getIncomingRequests,
+  getOutgoingRequests,
+  acceptFriendRequest,
+  rejectFriendRequest,
+  type FriendRequest,
+} from '../lib/friendRequests';
+import { useFriendRequests } from '../contexts/FriendRequestsContext';
+
+const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
+
+export default function NotificationsScreen() {
+  const navigation = useNavigation();
+  const { refreshPendingCount } = useFriendRequests();
+  const [incoming, setIncoming] = useState<FriendRequest[]>([]);
+  const [outgoing, setOutgoing] = useState<FriendRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actingId, setActingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [inc, out] = await Promise.all([getIncomingRequests(), getOutgoingRequests()]);
+      setIncoming(inc);
+      setOutgoing(out);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to load notifications';
+      setLoadError(message);
+      setIncoming([]);
+      setOutgoing([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    load();
+  }, [load]);
+
+  const handleAccept = useCallback(
+    async (requestId: string) => {
+      setActingId(requestId);
+      try {
+        await acceptFriendRequest(requestId);
+        setIncoming((prev) => prev.filter((r) => r.id !== requestId));
+        await refreshPendingCount();
+      } catch (e) {
+        Alert.alert('Error', e instanceof Error ? e.message : 'Failed to accept');
+      } finally {
+        setActingId(null);
+      }
+    },
+    [refreshPendingCount]
+  );
+
+  const handleDecline = useCallback(
+    async (requestId: string) => {
+      setActingId(requestId);
+      try {
+        await rejectFriendRequest(requestId);
+        setIncoming((prev) => prev.filter((r) => r.id !== requestId));
+        await refreshPendingCount();
+      } catch (e) {
+        Alert.alert('Error', e instanceof Error ? e.message : 'Failed to decline');
+      } finally {
+        setActingId(null);
+      }
+    },
+    [refreshPendingCount]
+  );
+
+  const isEmpty = incoming.length === 0 && outgoing.length === 0;
+  const emptyMessage = 'No recent notifications';
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
+        <View style={styles.headerRow}>
+          <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.6)" />
+          </Pressable>
+          <Text style={styles.title}>Notifications</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+        {loading && !refreshing ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color="rgba(255,255,255,0.6)" />
+          </View>
+        ) : loadError ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{loadError}</Text>
+            <Pressable style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.8 }]} onPress={() => load()} hitSlop={hitSlop}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="rgba(255,255,255,0.6)"
+              />
+            }
+          >
+            {isEmpty ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>{emptyMessage}</Text>
+              </View>
+            ) : (
+              <>
+                {incoming.length > 0 && (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Incoming</Text>
+                    <View style={styles.card}>
+                      {incoming.map((r) => (
+                        <View key={r.id} style={styles.row}>
+                          <View style={styles.rowLeft}>
+                            <Text style={styles.handle}>@{r.from_profile?.handle ?? 'unknown'}</Text>
+                            {r.from_profile?.display_name ? (
+                              <Text style={styles.muted}>{r.from_profile.display_name}</Text>
+                            ) : null}
+                          </View>
+                          <View style={styles.actions}>
+                            <Pressable
+                              style={({ pressed }) => [
+                                styles.acceptButton,
+                                (actingId === r.id || pressed) && { opacity: 0.8 },
+                              ]}
+                              onPress={() => handleAccept(r.id)}
+                              disabled={!!actingId}
+                              hitSlop={hitSlop}
+                            >
+                              {actingId === r.id ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                              ) : (
+                                <Text style={styles.acceptButtonText}>Accept</Text>
+                              )}
+                            </Pressable>
+                            <Pressable
+                              style={({ pressed }) => [
+                                styles.declineButton,
+                                (actingId === r.id || pressed) && { opacity: 0.8 },
+                              ]}
+                              onPress={() => handleDecline(r.id)}
+                              disabled={!!actingId}
+                              hitSlop={hitSlop}
+                            >
+                              <Text style={styles.declineButtonText}>Decline</Text>
+                            </Pressable>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+                {outgoing.length > 0 && (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Outgoing</Text>
+                    <View style={styles.card}>
+                      {outgoing.map((r) => (
+                        <View key={r.id} style={styles.row}>
+                          <View style={styles.rowLeft}>
+                            <Text style={styles.handle}>@{r.to_profile?.handle ?? 'unknown'}</Text>
+                            {r.to_profile?.display_name ? (
+                              <Text style={styles.muted}>{r.to_profile.display_name}</Text>
+                            ) : null}
+                          </View>
+                          <Text style={styles.pending}>Pending</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </>
+            )}
+          </ScrollView>
+        )}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  container: { flex: 1, padding: 20, paddingTop: 16 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  headerSpacer: { width: 24 },
+  title: { flex: 1, fontSize: 28, fontWeight: '600', color: '#fff', textAlign: 'center' },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 32 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyTitle: { fontSize: 16, color: 'rgba(255,255,255,0.6)' },
+  errorCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.3)',
+    padding: 24,
+    alignItems: 'center',
+  },
+  errorText: { fontSize: 16, color: '#fca5a5', marginBottom: 16, textAlign: 'center' },
+  retryButton: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  section: { marginBottom: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#fff', marginBottom: 12 },
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    padding: 16,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  rowLeft: { flex: 1 },
+  handle: { fontSize: 16, fontWeight: '500', color: '#fff' },
+  muted: { color: 'rgba(255,255,255,0.6)', fontSize: 14, marginTop: 2 },
+  actions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  acceptButton: {
+    backgroundColor: 'rgba(34,197,94,0.3)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 72,
+    alignItems: 'center',
+  },
+  acceptButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  declineButton: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  declineButtonText: { color: '#fff', fontSize: 14 },
+  pending: { color: 'rgba(255,255,255,0.5)', fontSize: 14 },
+});

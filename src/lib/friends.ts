@@ -8,34 +8,58 @@ export interface Friend {
 
 /**
  * List all friends for the current user.
- * Uses friendships table joined with profiles to get handle and display_name.
+ * Two-step: (1) friendships where user_id = auth.uid() → friend_id;
+ * (2) profiles where id IN (friend_ids) → id, handle, display_name.
+ * No embedded join to avoid schema/RLS issues with relationship cache.
  */
 export async function listFriends(): Promise<Friend[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const { data, error } = await supabase
+  const { data: friendshipRows, error: friendshipError } = await supabase
     .from('friendships')
-    .select(`
-      friend_id,
-      friend_profile:profiles!friendships_friend_id_fkey(handle, display_name)
-    `)
+    .select('friend_id')
     .eq('user_id', user.id);
 
-  if (error) {
-    console.error('Failed to list friends:', error);
-    throw new Error(`Failed to load friends: ${error.message}`);
+  if (friendshipError) {
+    throw new Error(`Failed to load friends: ${friendshipError.message}`);
+  }
+  if (!friendshipRows || friendshipRows.length === 0) {
+    return [];
   }
 
-  if (!data) return [];
+  const friendIds = friendshipRows.map((row: { friend_id: string }) => row.friend_id);
 
-  return data
-    .filter((row: any) => row.friend_profile)
-    .map((row: any) => ({
-      id: row.friend_id,
-      handle: row.friend_profile.handle,
-      display_name: row.friend_profile.display_name,
-    }));
+  const { data: profileRows, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, handle, display_name')
+    .in('id', friendIds);
+
+  if (profileError) {
+    throw new Error(`Failed to load friend profiles: ${profileError.message}`);
+  }
+
+  const profiles = (profileRows ?? []) as Array<{ id: string; handle: string; display_name: string | null }>;
+  if (friendIds.length > 0 && profiles.length === 0) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.warn(
+        'listFriends: friendships has rows but profiles returned empty (check RLS or profiles table)',
+        { friendIds }
+      );
+    }
+  }
+
+  const byId = new Map(profiles.map((p) => [p.id, p]));
+  const friends: Friend[] = friendIds
+    .map((id) => {
+      const p = byId.get(id);
+      if (!p) return null;
+      return { id: p.id, handle: p.handle, display_name: p.display_name };
+    })
+    .filter((f): f is Friend => f !== null);
+
+  friends.sort((a, b) => a.handle.localeCompare(b.handle, 'en', { sensitivity: 'base' }));
+  return friends;
 }
 
 /**
@@ -47,14 +71,12 @@ export async function deleteFriend(friendId: string): Promise<void> {
     throw new Error('Not authenticated');
   }
 
-  // Delete both directions of the friendship
   const { error } = await supabase
     .from('friendships')
     .delete()
     .or(`and(user_id.eq.${user.id},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${user.id})`);
 
   if (error) {
-    console.error('Failed to delete friend:', error);
     throw new Error(`Failed to remove friend: ${error.message}`);
   }
 }

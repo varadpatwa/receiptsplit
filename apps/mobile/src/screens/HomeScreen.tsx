@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { getReceiptTotal, formatCurrency } from '@receiptsplit/shared';
 import { useSplits } from '../contexts/SplitsContext';
+import { useFriendRequests } from '../contexts/FriendRequestsContext';
 import type { Split } from '@receiptsplit/shared';
 import type { HomeStackParamList } from '../navigation/HomeStack';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,7 +21,14 @@ type Nav = NativeStackNavigationProp<HomeStackParamList, 'HomeList'>;
 
 export default function HomeScreen() {
   const { splits, loading, createNewSplit, loadSplit, saveSplit, saveError, clearSaveError } = useSplits();
+  const { pendingIncomingCount, refreshPendingCount } = useFriendRequests();
   const navigation = useNavigation<Nav>();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshPendingCount();
+    }, [refreshPendingCount])
+  );
 
   const onNewSplit = () => {
     const newSplit = createNewSplit();
@@ -46,7 +55,34 @@ export default function HomeScreen() {
             <Text style={styles.errorBannerDismiss}>Dismiss</Text>
           </Pressable>
         ) : null}
-        <Text style={styles.title}>ReceiptSplit</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>ReceiptSplit</Text>
+          <View style={styles.headerIcons}>
+            <Pressable
+              style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.7 }]}
+              onPress={() => navigation.navigate('Search')}
+              hitSlop={hitSlop}
+              accessibilityRole="button"
+              accessibilityLabel="Search"
+            >
+              <Ionicons name="search" size={24} color="#fff" />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.7 }]}
+              onPress={() => navigation.navigate('Notifications')}
+              hitSlop={hitSlop}
+              accessibilityRole="button"
+              accessibilityLabel="Notifications"
+            >
+              <Ionicons name="notifications-outline" size={24} color="#fff" />
+              {pendingIncomingCount > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{pendingIncomingCount > 9 ? '9+' : pendingIncomingCount}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          </View>
+        </View>
         <Text style={styles.subtitle}>Split bills in under 60 seconds</Text>
         <Pressable
         style={({ pressed }) => [styles.newSplitButton, pressed && { opacity: 0.8 }]}
@@ -98,7 +134,23 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
   container: { flex: 1, padding: 20, paddingTop: 16 },
-  title: { fontSize: 28, fontWeight: '600', color: '#fff', marginBottom: 8 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  title: { fontSize: 28, fontWeight: '600', color: '#fff' },
+  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconButton: { padding: 4 },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#ef4444',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   subtitle: { color: 'rgba(255,255,255,0.6)', marginBottom: 24 },
   newSplitButton: {
     backgroundColor: '#fff',

@@ -12,6 +12,28 @@ export interface FriendRequest {
   to_profile?: { handle: string; display_name: string | null };
 }
 
+/**
+ * Returns the count of pending incoming friend requests (to_user_id = auth.uid(), status = 'pending').
+ * Uses count-only query; does not download rows.
+ */
+export async function getIncomingPendingCount(): Promise<number> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 0;
+  const { count, error } = await supabase
+    .from('friend_requests')
+    .select('*', { count: 'exact', head: true })
+    .eq('to_user_id', user.id)
+    .eq('status', 'pending');
+  if (error) {
+    throw new Error(`Failed to load pending count: ${error.message}`);
+  }
+  return count ?? 0;
+}
+
+/**
+ * Incoming: to_user_id = current user, status = pending, with sender profile (handle, display_name).
+ * Ordered by created_at desc. RLS must allow SELECT where to_user_id = auth.uid().
+ */
 export async function getIncomingRequests(): Promise<FriendRequest[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
@@ -21,10 +43,16 @@ export async function getIncomingRequests(): Promise<FriendRequest[]> {
     .eq('to_user_id', user.id)
     .eq('status', 'pending')
     .order('created_at', { ascending: false });
-  if (error) throw new Error(`Failed to load requests: ${error.message}`);
-  return data || [];
+  if (error) {
+    throw new Error(`Failed to load incoming requests: ${error.message}`);
+  }
+  return data ?? [];
 }
 
+/**
+ * Outgoing: from_user_id = current user, status = pending, with recipient profile.
+ * Ordered by created_at desc.
+ */
 export async function getOutgoingRequests(): Promise<FriendRequest[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
@@ -34,8 +62,10 @@ export async function getOutgoingRequests(): Promise<FriendRequest[]> {
     .eq('from_user_id', user.id)
     .eq('status', 'pending')
     .order('created_at', { ascending: false });
-  if (error) throw new Error(`Failed to load requests: ${error.message}`);
-  return data || [];
+  if (error) {
+    throw new Error(`Failed to load outgoing requests: ${error.message}`);
+  }
+  return data ?? [];
 }
 
 export async function sendFriendRequest(toUserId: string): Promise<FriendRequest> {
@@ -66,6 +96,11 @@ export async function acceptFriendRequest(requestId: string): Promise<void> {
 }
 
 export async function rejectFriendRequest(requestId: string): Promise<void> {
-  const { error } = await supabase.from('friend_requests').update({ status: 'rejected' }).eq('id', requestId);
-  if (error) throw new Error(`Failed to reject request: ${error.message}`);
+  const { error } = await supabase
+    .from('friend_requests')
+    .update({ status: 'rejected' })
+    .eq('id', requestId);
+  if (error) {
+    throw new Error(`Failed to reject request: ${error.message}`);
+  }
 }

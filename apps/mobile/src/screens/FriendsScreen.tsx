@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, StyleSheet, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 
 const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
 import { useAuth } from '../contexts/AuthContext';
+import { useFriendRequests } from '../contexts/FriendRequestsContext';
 import { searchProfilesByHandle } from '../lib/supabase';
 import { listFriends, deleteFriend, type Friend } from '../lib/friends';
 import {
@@ -17,6 +19,7 @@ import {
 
 export default function FriendsScreen() {
   const userId = useAuth().userId;
+  const { refreshPendingCount } = useFriendRequests();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [incoming, setIncoming] = useState<FriendRequest[]>([]);
   const [outgoing, setOutgoing] = useState<FriendRequest[]>([]);
@@ -49,6 +52,12 @@ export default function FriendsScreen() {
     load();
   }, [userId]);
 
+  useFocusEffect(
+    useCallback(() => {
+      refreshPendingCount();
+    }, [refreshPendingCount])
+  );
+
   useEffect(() => {
     if (!searchQuery.trim() || !userId) {
       setSearchResults([]);
@@ -77,6 +86,7 @@ export default function FriendsScreen() {
     try {
       await sendFriendRequest(toUserId);
       await load();
+      await refreshPendingCount();
       setSearchQuery('');
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Failed to send request');
@@ -91,6 +101,7 @@ export default function FriendsScreen() {
     try {
       await acceptFriendRequest(requestId);
       await load();
+      await refreshPendingCount();
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Failed to accept');
     } finally {
@@ -103,6 +114,7 @@ export default function FriendsScreen() {
     try {
       await rejectFriendRequest(requestId);
       await load();
+      await refreshPendingCount();
     } catch {
       // ignore
     } finally {
