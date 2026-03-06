@@ -21,7 +21,8 @@ type Nav = NativeStackNavigationProp<HomeStackParamList, 'HomeList'>;
 
 export default function HomeScreen() {
   const { splits, loading, createNewSplit, loadSplit, saveSplit, saveError, clearSaveError } = useSplits();
-  const { pendingIncomingCount, refreshPendingCount } = useFriendRequests();
+  const { pendingIncomingCount, pendingSplitCount, refreshPendingCount } = useFriendRequests();
+  const totalBadgeCount = pendingIncomingCount + pendingSplitCount;
   const navigation = useNavigation<Nav>();
 
   useFocusEffect(
@@ -75,9 +76,9 @@ export default function HomeScreen() {
               accessibilityLabel="Notifications"
             >
               <Ionicons name="notifications-outline" size={24} color="#fff" />
-              {pendingIncomingCount > 0 ? (
+              {totalBadgeCount > 0 ? (
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{pendingIncomingCount > 9 ? '9+' : pendingIncomingCount}</Text>
+                  <Text style={styles.badgeText}>{totalBadgeCount > 9 ? '9+' : totalBadgeCount}</Text>
                 </View>
               ) : null}
             </Pressable>

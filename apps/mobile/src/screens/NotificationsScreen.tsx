@@ -19,7 +19,14 @@ import {
   rejectFriendRequest,
   type FriendRequest,
 } from '../lib/friendRequests';
+import {
+  getPendingSplitRequests,
+  confirmSplitRequest,
+  rejectSplitRequest,
+  type PendingSplitRequest,
+} from '../lib/splitFriendRequests';
 import { useFriendRequests } from '../contexts/FriendRequestsContext';
+import { formatCurrency } from '@receiptsplit/shared';
 
 const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
 
@@ -28,23 +35,31 @@ export default function NotificationsScreen() {
   const { refreshPendingCount } = useFriendRequests();
   const [incoming, setIncoming] = useState<FriendRequest[]>([]);
   const [outgoing, setOutgoing] = useState<FriendRequest[]>([]);
+  const [splitRequests, setSplitRequests] = useState<PendingSplitRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
+  const [actingSplitKey, setActingSplitKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const [inc, out] = await Promise.all([getIncomingRequests(), getOutgoingRequests()]);
+      const [inc, out, split] = await Promise.all([
+        getIncomingRequests(),
+        getOutgoingRequests(),
+        getPendingSplitRequests(),
+      ]);
       setIncoming(inc);
       setOutgoing(out);
+      setSplitRequests(split);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to load notifications';
       setLoadError(message);
       setIncoming([]);
       setOutgoing([]);
+      setSplitRequests([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -94,8 +109,47 @@ export default function NotificationsScreen() {
     [refreshPendingCount]
   );
 
-  const isEmpty = incoming.length === 0 && outgoing.length === 0;
+  const handleSplitAccept = useCallback(
+    async (splitId: string, friendUserId: string) => {
+      const key = `${splitId}-${friendUserId}`;
+      setActingSplitKey(key);
+      try {
+        await confirmSplitRequest(splitId, friendUserId);
+        setSplitRequests((prev) => prev.filter((r) => r.split_id !== splitId || r.friend_user_id !== friendUserId));
+        await refreshPendingCount();
+      } catch (e) {
+        Alert.alert('Error', e instanceof Error ? e.message : 'Failed to accept');
+      } finally {
+        setActingSplitKey(null);
+      }
+    },
+    [refreshPendingCount]
+  );
+
+  const handleSplitReject = useCallback(
+    async (splitId: string, friendUserId: string) => {
+      const key = `${splitId}-${friendUserId}`;
+      setActingSplitKey(key);
+      try {
+        await rejectSplitRequest(splitId, friendUserId);
+        setSplitRequests((prev) => prev.filter((r) => r.split_id !== splitId || r.friend_user_id !== friendUserId));
+        await refreshPendingCount();
+      } catch (e) {
+        Alert.alert('Error', e instanceof Error ? e.message : 'Failed to reject');
+      } finally {
+        setActingSplitKey(null);
+      }
+    },
+    [refreshPendingCount]
+  );
+
+  const isEmpty = incoming.length === 0 && outgoing.length === 0 && splitRequests.length === 0;
   const emptyMessage = 'No recent notifications';
+
+  function formatSplitDate(iso: string): string {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -196,6 +250,50 @@ export default function NotificationsScreen() {
                           <Text style={styles.pending}>Pending</Text>
                         </View>
                       ))}
+                    </View>
+                  </View>
+                )}
+                {splitRequests.length > 0 && (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Split confirmations</Text>
+                    <View style={styles.card}>
+                      {splitRequests.map((r) => {
+                        const rowKey = `${r.split_id}-${r.friend_user_id}`;
+                        const acting = actingSplitKey === rowKey;
+                        return (
+                          <View key={rowKey} style={styles.row}>
+                            <View style={styles.rowLeft}>
+                              <Text style={styles.handle}>{r.split_title}</Text>
+                              <Text style={styles.muted}>
+                                {formatSplitDate(r.split_created_at)}
+                                {r.owner_handle ? ` · @${r.owner_handle}` : ''} · {formatCurrency(r.share_amount)}
+                              </Text>
+                            </View>
+                            <View style={styles.actions}>
+                              <Pressable
+                                style={[styles.acceptButton, acting && { opacity: 0.8 }]}
+                                onPress={() => handleSplitAccept(r.split_id, r.friend_user_id)}
+                                disabled={!!actingSplitKey}
+                                hitSlop={hitSlop}
+                              >
+                                {acting ? (
+                                  <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                  <Text style={styles.acceptButtonText}>Accept</Text>
+                                )}
+                              </Pressable>
+                              <Pressable
+                                style={[styles.declineButton, acting && { opacity: 0.8 }]}
+                                onPress={() => handleSplitReject(r.split_id, r.friend_user_id)}
+                                disabled={!!actingSplitKey}
+                                hitSlop={hitSlop}
+                              >
+                                <Text style={styles.declineButtonText}>Reject</Text>
+                              </Pressable>
+                            </View>
+                          </View>
+                        );
+                      })}
                     </View>
                   </View>
                 )}

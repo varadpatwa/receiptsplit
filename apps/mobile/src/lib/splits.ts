@@ -1,5 +1,6 @@
 import type { Split, Participant } from '@receiptsplit/shared';
 import { supabase } from './supabase';
+import { upsertFriendRequestsForSplit } from './splitFriendRequests';
 
 const ME_PARTICIPANT_ID = 'me';
 const ME_PARTICIPANT_NAME = 'Me';
@@ -131,7 +132,17 @@ export async function createSplit(split: Split): Promise<Split> {
     result = await supabase.from('splits').insert(payloadRequiredOnly).select().single();
   }
   if (result.error) throw new Error(`Failed to create split: ${result.error.message}`);
-  return rowToSplit(result.data);
+  const saved = rowToSplit(result.data);
+  try {
+    // Use saved id: createSplit omits id so Postgres generates it; normalized.id is client-only.
+    await upsertFriendRequestsForSplit({ ...normalized, id: saved.id });
+  } catch (e) {
+    if (__DEV__) {
+      console.warn('[splits] upsertFriendRequestsForSplit after create failed:', e);
+    }
+    // non-fatal: split is saved; requests can be retried
+  }
+  return saved;
 }
 
 export async function updateSplit(split: Split): Promise<Split> {
@@ -165,7 +176,16 @@ export async function updateSplit(split: Split): Promise<Split> {
       .single();
   }
   if (result.error) throw new Error(`Failed to update split: ${result.error.message}`);
-  return rowToSplit(result.data);
+  const saved = rowToSplit(result.data);
+  try {
+    await upsertFriendRequestsForSplit(normalized);
+  } catch (e) {
+    if (__DEV__) {
+      console.warn('[splits] upsertFriendRequestsForSplit after update failed:', e);
+    }
+    // non-fatal
+  }
+  return saved;
 }
 
 export async function deleteSplit(splitId: string): Promise<void> {

@@ -1,5 +1,4 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -20,7 +19,7 @@ const tabIcons: Record<string, { focused: string; unfocused: string }> = {
 };
 
 export default function MainTabs() {
-  const { pendingIncomingCount, refreshPendingCount } = useFriendRequests();
+  const { refreshPendingCount } = useFriendRequests();
 
   useFocusEffect(
     useCallback(() => {
@@ -38,18 +37,7 @@ export default function MainTabs() {
         tabBarIcon: ({ focused, color, size }) => {
           const icons = tabIcons[route.name];
           const name = icons ? (focused ? icons.focused : icons.unfocused) : 'ellipse';
-          const icon = <Ionicons name={name as any} size={size ?? 24} color={color} />;
-          if (route.name === 'Friends' && pendingIncomingCount > 0) {
-            return (
-              <View style={styles.iconWrap}>
-                {icon}
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{pendingIncomingCount > 9 ? '9+' : pendingIncomingCount}</Text>
-                </View>
-              </View>
-            );
-          }
-          return icon;
+          return <Ionicons name={name as any} size={size ?? 24} color={color} />;
         },
       })}
     >
@@ -60,20 +48,3 @@ export default function MainTabs() {
     </Tab.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  iconWrap: { position: 'relative' },
-  badge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#ef4444',
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-});

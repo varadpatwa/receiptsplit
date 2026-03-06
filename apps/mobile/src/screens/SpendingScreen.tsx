@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getSplitsThisMonth, getUserSpendingCents, getCategoryTotals, formatCurrency } from '@receiptsplit/shared';
+import { useFocusEffect } from '@react-navigation/native';
+import { getSplitsThisMonth, getUserSpendingCents, getCategoryTotals, getThisMonthStart, formatCurrency } from '@receiptsplit/shared';
 import type { CategoryTotal } from '@receiptsplit/shared';
 import { useSplits } from '../contexts/SplitsContext';
+import { getConfirmedFriendSharesRaw, getConfirmedSharesForMonth } from '../lib/splitFriendRequests';
 import { DonutChart, type DonutSegment } from '../components/DonutChart';
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -13,20 +15,65 @@ const CATEGORY_COLORS: Record<string, string> = {
   Utilities: '#3b82f6',
   Other: '#64748b',
   Uncategorized: '#94a3b8',
+  Shared: '#14b8a6',
 };
 
 function getCategoryColor(category: string): string {
   return CATEGORY_COLORS[category] ?? '#94a3b8';
 }
 
+function mergeCategoryTotals(
+  own: CategoryTotal[],
+  confirmedCategoryCents: Array<{ category: string; cents: number }>,
+  totalCents: number
+): CategoryTotal[] {
+  const byCategory = new Map<string, number>();
+  own.forEach((c) => byCategory.set(c.category, (byCategory.get(c.category) ?? 0) + c.cents));
+  confirmedCategoryCents.forEach(({ category, cents }) =>
+    byCategory.set(category, (byCategory.get(category) ?? 0) + cents)
+  );
+  if (totalCents <= 0) return own;
+  return Array.from(byCategory.entries())
+    .map(([category, cents]) => ({
+      category,
+      cents,
+      percent: (cents / totalCents) * 100,
+    }))
+    .sort((a, b) => b.cents - a.cents);
+}
+
 export default function SpendingScreen() {
   const { splits, loading } = useSplits();
+  const [confirmedRaw, setConfirmedRaw] = useState<{ totalCents: number }>({ totalCents: 0 });
+  const [confirmedShares, setConfirmedShares] = useState<{ totalCents: number; categoryCents: Array<{ category: string; cents: number }> }>({
+    totalCents: 0,
+    categoryCents: [],
+  });
+  const monthStart = getThisMonthStart();
+  const loadConfirmed = useCallback(async () => {
+    try {
+      const [raw, withCategory] = await Promise.all([
+        getConfirmedFriendSharesRaw(monthStart),
+        getConfirmedSharesForMonth(monthStart),
+      ]);
+      setConfirmedRaw({ totalCents: raw.totalCents });
+      setConfirmedShares({ totalCents: withCategory.totalCents, categoryCents: withCategory.categoryCents });
+    } catch {
+      setConfirmedRaw({ totalCents: 0 });
+      setConfirmedShares({ totalCents: 0, categoryCents: [] });
+    }
+  }, [monthStart]);
+  useFocusEffect(useCallback(() => {
+    loadConfirmed();
+  }, [loadConfirmed]));
   const thisMonth = getSplitsThisMonth(splits);
-  const totalCents = getUserSpendingCents(thisMonth);
-  const categoryTotals = getCategoryTotals(thisMonth);
+  const ownerCentsTotal = getUserSpendingCents(thisMonth);
+  const totalCents = ownerCentsTotal + confirmedRaw.totalCents;
+  const ownCategoryTotals = getCategoryTotals(thisMonth);
+  const mergedCategoryTotals = mergeCategoryTotals(ownCategoryTotals, confirmedShares.categoryCents, totalCents);
   const hasData = totalCents > 0;
 
-  const donutSegments: DonutSegment[] = categoryTotals
+  const donutSegments: DonutSegment[] = mergedCategoryTotals
     .filter((c) => c.cents > 0)
     .map((c) => ({
       category: c.category,
@@ -61,7 +108,7 @@ export default function SpendingScreen() {
             {hasData ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>By category</Text>
-                {categoryTotals
+                {mergedCategoryTotals
                   .filter((c: CategoryTotal) => c.cents > 0)
                   .map((c: CategoryTotal) => (
                     <View key={c.category} style={styles.categoryRow}>
