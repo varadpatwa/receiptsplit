@@ -36,3 +36,4 @@ core
 .github/
 
 **/tempobook/**
+supabase/.temp/
