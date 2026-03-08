@@ -19,6 +19,12 @@ CREATE INDEX IF NOT EXISTS idx_split_friend_requests_friend_status
 -- RLS
 ALTER TABLE public.split_friend_requests ENABLE ROW LEVEL SECURITY;
 
+-- Drop policies if they exist (idempotent for re-runs)
+DROP POLICY IF EXISTS split_friend_requests_select_receiver ON public.split_friend_requests;
+DROP POLICY IF EXISTS split_friend_requests_update_receiver ON public.split_friend_requests;
+DROP POLICY IF EXISTS split_friend_requests_insert_owner ON public.split_friend_requests;
+DROP POLICY IF EXISTS splits_select_receiver_via_request ON public.splits;
+
 -- Receiver: select own rows (where they are the friend being asked to confirm)
 CREATE POLICY split_friend_requests_select_receiver
   ON public.split_friend_requests FOR SELECT

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +6,12 @@ import type { Split, ItemAssignment } from '@receiptsplit/shared';
 import { formatCurrency, getRunningTally, allItemsAssigned } from '@receiptsplit/shared';
 import { Stepper } from '../../components/Stepper';
 import { ParticipantChip } from '../../components/ParticipantChip';
+import {
+  getAssignmentFrequency,
+  suggestAssignments,
+  updateAssignmentFrequency,
+  type AssignmentSuggestion,
+} from '../../lib/assignmentSuggestions';
 
 interface AssignScreenProps {
   split: Split;
@@ -15,9 +21,58 @@ interface AssignScreenProps {
 }
 
 export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenProps) {
+  const [suggestions, setSuggestions] = useState<Map<string, AssignmentSuggestion>>(new Map());
+
+  useEffect(() => {
+    let cancelled = false;
+    getAssignmentFrequency().then((freq) => {
+      if (cancelled) return;
+      const map = suggestAssignments(split, freq);
+      setSuggestions(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [split.id, split.items.length, split.participants.length]);
+
   const runningTally = getRunningTally(split);
   const allAssigned = allItemsAssigned(split);
   const unassignedItems = split.items.filter((item) => item.assignments.length === 0);
+  const hasAnySuggestion = Array.from(suggestions.values()).some((s) => s.confidence > 0);
+  const suggestedButNotApplied = split.items.some((item) => {
+    const sug = suggestions.get(item.id);
+    return sug && sug.confidence > 0 && sug.assignments.length > 0 && item.assignments.length === 0;
+  });
+
+  const applySuggestionForItem = useCallback(
+    (itemId: string) => {
+      const sug = suggestions.get(itemId);
+      if (!sug || sug.assignments.length === 0) return;
+      onUpdate({
+        ...split,
+        items: split.items.map((i) =>
+          i.id === itemId ? { ...i, assignments: [...sug.assignments] } : i
+        ),
+      });
+    },
+    [split, suggestions, onUpdate]
+  );
+
+  const confirmAllSuggestions = useCallback(() => {
+    const nextItems = split.items.map((item) => {
+      const sug = suggestions.get(item.id);
+      if (sug && sug.confidence > 0 && sug.assignments.length > 0) {
+        return { ...item, assignments: [...sug.assignments] };
+      }
+      return item;
+    });
+    onUpdate({ ...split, items: nextItems });
+  }, [split, suggestions, onUpdate]);
+
+  const handleNext = useCallback(async () => {
+    await updateAssignmentFrequency(split.items, split.participants);
+    onNext();
+  }, [split.items, split.participants, onNext]);
 
   const toggleAssignment = (itemId: string, participantId: string) => {
     const item = split.items.find((i) => i.id === itemId);
@@ -53,6 +108,23 @@ export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenPr
         </View>
         <Stepper currentStep="assign" />
 
+        {hasAnySuggestion && (
+          <View style={styles.suggestionBanner}>
+            <Ionicons name="sparkles" size={20} color="rgba(34,197,94,0.9)" />
+            <View style={styles.suggestionBannerText}>
+              <Text style={styles.suggestionBannerTitle}>Suggested split generated</Text>
+              <Text style={styles.suggestionBannerSub}>
+                Tap &quot;Use suggestion&quot; on an item or confirm all below.
+              </Text>
+            </View>
+            {suggestedButNotApplied && (
+              <Pressable onPress={confirmAllSuggestions} style={styles.confirmSuggestionsBtn}>
+                <Text style={styles.confirmSuggestionsBtnText}>Confirm suggestions</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Running Tally</Text>
           {split.participants.map((p) => {
@@ -81,6 +153,15 @@ export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenPr
         {split.items.map((item) => {
           const itemTotal = item.priceInCents * item.quantity;
           const hasAssignment = item.assignments.length > 0;
+          const sug = suggestions.get(item.id);
+          const hasSuggestion = sug && sug.confidence > 0 && sug.assignments.length > 0;
+          const suggestedNames =
+            hasSuggestion && split.participants.length
+              ? sug!.assignments
+                  .map((a) => split.participants.find((p) => p.id === a.participantId)?.name)
+                  .filter(Boolean)
+                  .join(', ')
+              : '';
           return (
             <View key={item.id} style={[styles.itemCard, !hasAssignment && styles.itemCardUnassigned]}>
               <View style={styles.itemHeader}>
@@ -100,6 +181,17 @@ export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenPr
                 </View>
                 {!hasAssignment && <Ionicons name="alert-circle" size={20} color="rgba(255,200,0,0.9)" />}
               </View>
+              {hasSuggestion && !hasAssignment && (
+                <Pressable
+                  onPress={() => applySuggestionForItem(item.id)}
+                  style={styles.useSuggestionBtn}
+                >
+                  <Ionicons name="checkmark-circle-outline" size={18} color="rgba(34,197,94,0.9)" />
+                  <Text style={styles.useSuggestionText}>
+                    Use suggestion: {suggestedNames || 'Split'}
+                  </Text>
+                </Pressable>
+              )}
               <Text style={styles.whoShared}>Who shared this?</Text>
               <View style={styles.chipRow}>
                 {split.participants.map((p) => (
@@ -116,7 +208,7 @@ export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenPr
         })}
 
         <Pressable
-          onPress={onNext}
+          onPress={handleNext}
           disabled={!allAssigned}
           style={({ pressed }) => [styles.nextBtn, !allAssigned && styles.nextBtnDisabled, pressed && { opacity: 0.8 }]}
         >
@@ -161,6 +253,41 @@ const styles = StyleSheet.create({
   warningText: { flex: 1 },
   warningTitle: { fontWeight: '600', color: 'rgba(255,200,0,0.9)' },
   warningSub: { fontSize: 14, color: 'rgba(255,200,0,0.8)', marginTop: 4 },
+  suggestionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.25)',
+    backgroundColor: 'rgba(34,197,94,0.08)',
+    marginBottom: 16,
+  },
+  suggestionBannerText: { flex: 1, minWidth: 120 },
+  suggestionBannerTitle: { fontWeight: '600', color: 'rgba(34,197,94,0.95)' },
+  suggestionBannerSub: { fontSize: 13, color: 'rgba(34,197,94,0.8)', marginTop: 4 },
+  confirmSuggestionsBtn: {
+    backgroundColor: 'rgba(34,197,94,0.9)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  confirmSuggestionsBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  useSuggestionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(34,197,94,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.25)',
+  },
+  useSuggestionText: { fontSize: 14, color: 'rgba(34,197,94,0.95)', fontWeight: '500' },
   itemCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,

@@ -10,7 +10,9 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { Split, Item, SplitCategory } from '@receiptsplit/shared';
@@ -22,6 +24,8 @@ import {
   centsToMoneyString,
 } from '@receiptsplit/shared';
 import { Stepper } from '../../components/Stepper';
+import { useAuth } from '../../contexts/AuthContext';
+import { uploadAndParseReceipt } from '../../lib/parseReceipt';
 
 const CATEGORIES: SplitCategory[] = ['Restaurant', 'Grocery', 'Entertainment', 'Utilities', 'Other'];
 
@@ -35,10 +39,13 @@ interface ReceiptScreenProps {
 }
 
 export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clearSaveError }: ReceiptScreenProps) {
+  const { userId } = useAuth();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [priceInputs, setPriceInputs] = useState<Record<string, string>>({});
   const [taxInput, setTaxInput] = useState('');
   const [tipInput, setTipInput] = useState('');
+  const [parseLoading, setParseLoading] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
 
   useEffect(() => {
     const newPriceInputs: Record<string, string> = {};
@@ -60,6 +67,57 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
     };
     setPriceInputs((prev) => ({ ...prev, [newItem.id]: '' }));
     onUpdate({ ...split, items: [...split.items, newItem] });
+  };
+
+  const handleUploadReceipt = async () => {
+    if (!userId) {
+      Alert.alert('Sign in required', 'Please sign in to scan a receipt.');
+      return;
+    }
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow access to your photos to upload a receipt.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+
+    setParseLoading(true);
+    setParseError(null);
+    try {
+      const parsed = await uploadAndParseReceipt(result.assets[0].uri, userId);
+      const newItems: Item[] = parsed.items.map((it) => ({
+        id: generateId(),
+        name: it.label,
+        priceInCents: it.unit_price,
+        quantity: it.quantity,
+        assignments: [],
+      }));
+      const nextSplit: Split = {
+        ...split,
+        items: newItems,
+        taxInCents: parsed.tax,
+        tipInCents: parsed.tip,
+      };
+      onUpdate(nextSplit);
+      const nextPriceInputs: Record<string, string> = {};
+      newItems.forEach((item) => {
+        nextPriceInputs[item.id] = centsToMoneyString(item.priceInCents);
+      });
+      setPriceInputs(nextPriceInputs);
+      setTaxInput(centsToMoneyString(parsed.tax));
+      setTipInput(centsToMoneyString(parsed.tip));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to parse receipt';
+      setParseError(message);
+    } finally {
+      setParseLoading(false);
+    }
   };
 
   const updateItem = (itemId: string, updates: Partial<Item>) => {
@@ -204,10 +262,32 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
         <View style={styles.card}>
           <View style={styles.rowSpace}>
             <Text style={styles.cardTitle}>Items</Text>
-            <Pressable onPress={addItem} style={styles.iconBtn}>
-              <Ionicons name="add" size={24} color="#fff" />
-            </Pressable>
+            <View style={styles.itemsHeaderRight}>
+              <Pressable
+                onPress={handleUploadReceipt}
+                disabled={parseLoading}
+                style={[styles.scanBtn, parseLoading && styles.scanBtnDisabled]}
+              >
+                {parseLoading ? (
+                  <ActivityIndicator size="small" color="#0B0B0C" />
+                ) : (
+                  <>
+                    <Ionicons name="camera-outline" size={20} color="#0B0B0C" />
+                    <Text style={styles.scanBtnText}>Scan receipt</Text>
+                  </>
+                )}
+              </Pressable>
+              <Pressable onPress={addItem} style={styles.iconBtn}>
+                <Ionicons name="add" size={24} color="#fff" />
+              </Pressable>
+            </View>
           </View>
+          {parseError ? (
+            <Pressable style={styles.parseErrorBanner} onPress={() => setParseError(null)}>
+              <Text style={styles.parseErrorText}>{parseError}</Text>
+              <Text style={styles.parseErrorDismiss}>Dismiss</Text>
+            </Pressable>
+          ) : null}
           {split.items.length === 0 ? (
             <View style={styles.emptyItems}>
               <Text style={styles.muted}>No items yet. Add your first item.</Text>
@@ -360,6 +440,31 @@ const styles = StyleSheet.create({
   chipTextSelected: { color: '#000' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   rowSpace: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  itemsHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  scanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  scanBtnDisabled: { opacity: 0.7 },
+  scanBtnText: { fontSize: 14, fontWeight: '600', color: '#0B0B0C' },
+  parseErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(239,68,68,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.3)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  parseErrorText: { flex: 1, color: '#fca5a5', fontSize: 14 },
+  parseErrorDismiss: { color: '#fca5a5', fontSize: 14, fontWeight: '600', marginLeft: 8 },
   flex1: { flex: 1 },
   muted: { fontSize: 14, color: 'rgba(255,255,255,0.6)' },
   mutedSmall: { fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 },
