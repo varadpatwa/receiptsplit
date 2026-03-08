@@ -9,11 +9,75 @@ export interface CategoryTotal {
   percent: number;
 }
 
+export type SpendingPeriod = 'daily' | 'weekly' | 'monthly';
+
 export function getThisMonthStart(): number {
   const d = new Date();
   d.setUTCDate(1);
   d.setUTCHours(0, 0, 0, 0);
   return d.getTime();
+}
+
+export function getTodayStart(): number {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+export function getWeekStart(): number {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0=Sun, 1=Mon, ...
+  const diff = day === 0 ? 6 : day - 1; // Monday-based
+  d.setDate(d.getDate() - diff);
+  return d.getTime();
+}
+
+export function getMonthStartLocal(): number {
+  const d = new Date();
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+export function getPeriodStart(period: SpendingPeriod): number {
+  switch (period) {
+    case 'daily': return getTodayStart();
+    case 'weekly': return getWeekStart();
+    case 'monthly': return getMonthStartLocal();
+  }
+}
+
+export function getPeriodEnd(period: SpendingPeriod): number {
+  const start = getPeriodStart(period);
+  const d = new Date(start);
+  switch (period) {
+    case 'daily':
+      d.setDate(d.getDate() + 1);
+      break;
+    case 'weekly':
+      d.setDate(d.getDate() + 7);
+      break;
+    case 'monthly':
+      d.setMonth(d.getMonth() + 1);
+      break;
+  }
+  return d.getTime();
+}
+
+export function getPeriodLabel(period: SpendingPeriod): string {
+  switch (period) {
+    case 'daily': return 'Today';
+    case 'weekly': return 'This week';
+    case 'monthly': return 'This month';
+  }
+}
+
+export function getSplitsInRange(splits: Split[], startMs: number, endMs: number): Split[] {
+  return splits.filter((s) => {
+    const ts = s.updatedAt ?? s.createdAt;
+    return ts >= startMs && ts < endMs;
+  });
 }
 
 export function getSplitsThisMonth(splits: Split[]): Split[] {

@@ -2,10 +2,13 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type { Split } from '@receiptsplit/shared';
 import { generateUuid } from '@receiptsplit/shared';
 import { useAuth } from './AuthContext';
-import { listSplits, createSplit, updateSplit, deleteSplit as deleteSplitFromSupabase } from '../lib/splits';
+import { listSplits, createSplit, updateSplit, softDeleteSplit } from '../lib/splits';
 
 type SplitsContextValue = {
+  /** All splits including soft-deleted (for spending calculations). */
   splits: Split[];
+  /** Active (non-deleted) splits for display in Recent Splits. */
+  activeSplits: Split[];
   currentSplit: Split | null;
   loading: boolean;
   saveError: string | null;
@@ -134,17 +137,21 @@ export function SplitsProvider({ children }: { children: React.ReactNode }) {
   const deleteSplit = useCallback(
     async (splitId: string) => {
       if (!userId) return;
+      // Optimistic: mark as deleted locally
+      setSplits((prev) =>
+        prev.map((s) => (s.id === splitId ? { ...s, isDeleted: true } : s))
+      );
+      if (currentSplit?.id === splitId) setCurrentSplit(null);
       try {
-        await deleteSplitFromSupabase(splitId);
-        setSplits((prev) => prev.filter((s) => s.id !== splitId));
-        if (currentSplit?.id === splitId) setCurrentSplit(null);
+        await softDeleteSplit(splitId);
       } catch {
-        setSplits((prev) => prev.filter((s) => s.id !== splitId));
-        if (currentSplit?.id === splitId) setCurrentSplit(null);
+        // Already marked locally; will sync on next refetch
       }
     },
     [userId, currentSplit?.id]
   );
+
+  const activeSplits = splits.filter((s) => !s.isDeleted);
 
   const updateCurrentSplit = useCallback(
     (updater: (split: Split) => Split, immediate = false) => {
@@ -158,6 +165,7 @@ export function SplitsProvider({ children }: { children: React.ReactNode }) {
 
   const value: SplitsContextValue = {
     splits,
+    activeSplits,
     currentSplit,
     loading,
     saveError,

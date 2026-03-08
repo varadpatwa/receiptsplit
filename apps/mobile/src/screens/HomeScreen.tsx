@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getReceiptTotal, formatCurrency } from '@receiptsplit/shared';
 import { useSplits } from '../contexts/SplitsContext';
 import { useFriendRequests } from '../contexts/FriendRequestsContext';
+import { SwipeableRow } from '../components/SwipeableRow';
 import type { Split } from '@receiptsplit/shared';
 import type { HomeStackParamList } from '../navigation/HomeStack';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -20,7 +21,7 @@ function formatDate(ts: number): string {
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'HomeList'>;
 
 export default function HomeScreen() {
-  const { splits, loading, createNewSplit, loadSplit, saveSplit, saveError, clearSaveError } = useSplits();
+  const { activeSplits, loading, createNewSplit, loadSplit, saveSplit, deleteSplit, saveError, clearSaveError } = useSplits();
   const { pendingIncomingCount, pendingSplitCount, refreshPendingCount } = useFriendRequests();
   const totalBadgeCount = pendingIncomingCount + pendingSplitCount;
   const navigation = useNavigation<Nav>();
@@ -45,7 +46,7 @@ export default function HomeScreen() {
     navigation.navigate(screenName);
   };
 
-  const sorted = [...splits].sort((a, b) => b.updatedAt - a.updatedAt);
+  const sorted = [...activeSplits].sort((a, b) => b.updatedAt - a.updatedAt);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -107,22 +108,24 @@ export default function HomeScreen() {
           data={sorted}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <Pressable
-              style={({ pressed }) => [styles.card, pressed && { opacity: 0.8 }]}
-              onPress={() => onSplitPress(item)}
-              hitSlop={hitSlop}
-              accessibilityRole="button"
-              accessibilityLabel={`Open split ${item.name}`}
-            >
-              <View style={styles.cardRow}>
-                <View style={styles.cardLeft}>
-                  <Text style={styles.cardName}>{item.name}</Text>
-                  <Text style={styles.muted}>
-                    {formatDate(item.updatedAt)} · {formatCurrency(getReceiptTotal(item) || 0)} · {item.participants.length} people
-                  </Text>
+            <SwipeableRow onDelete={() => deleteSplit(item.id)}>
+              <Pressable
+                style={({ pressed }) => [styles.card, pressed && { opacity: 0.8 }]}
+                onPress={() => onSplitPress(item)}
+                hitSlop={hitSlop}
+                accessibilityRole="button"
+                accessibilityLabel={`Open split ${item.name}`}
+              >
+                <View style={styles.cardRow}>
+                  <View style={styles.cardLeft}>
+                    <Text style={styles.cardName}>{item.name}</Text>
+                    <Text style={styles.muted}>
+                      {formatDate(item.updatedAt)} · {formatCurrency(getReceiptTotal(item) || 0)} · {item.participants.length} people
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            </Pressable>
+              </Pressable>
+            </SwipeableRow>
           )}
           style={styles.list}
         />
@@ -169,7 +172,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     padding: 16,
-    marginBottom: 12,
   },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardLeft: { flex: 1 },

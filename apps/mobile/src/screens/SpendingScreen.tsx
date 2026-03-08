@@ -1,12 +1,20 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, Modal, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { getSplitsThisMonth, getUserSpendingCents, getCategoryTotals, getThisMonthStart, formatCurrency } from '@receiptsplit/shared';
-import type { CategoryTotal } from '@receiptsplit/shared';
+import { Ionicons } from '@expo/vector-icons';
+import { getSplitsInRange, getPeriodStart, getPeriodEnd, getPeriodLabel, getUserSpendingCents, getCategoryTotals, formatCurrency } from '@receiptsplit/shared';
+import type { SpendingPeriod, CategoryTotal } from '@receiptsplit/shared';
 import { useSplits } from '../contexts/SplitsContext';
-import { getConfirmedFriendSharesRaw, getConfirmedSharesForMonth } from '../lib/splitFriendRequests';
+import { getConfirmedFriendSharesForRange, getConfirmedSharesForRange } from '../lib/splitFriendRequests';
 import { DonutChart, type DonutSegment } from '../components/DonutChart';
+
+const PERIODS: SpendingPeriod[] = ['daily', 'weekly', 'monthly'];
+const PERIOD_MENU_LABELS: Record<SpendingPeriod, string> = {
+  daily: 'Today',
+  weekly: 'This week',
+  monthly: 'This month',
+};
 
 const CATEGORY_COLORS: Record<string, string> = {
   Restaurant: '#f97316',
@@ -42,35 +50,68 @@ function mergeCategoryTotals(
     .sort((a, b) => b.cents - a.cents);
 }
 
+const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
+
 export default function SpendingScreen() {
   const { splits, loading } = useSplits();
+  const [period, setPeriod] = useState<SpendingPeriod>('weekly');
   const [confirmedRaw, setConfirmedRaw] = useState<{ totalCents: number }>({ totalCents: 0 });
   const [confirmedShares, setConfirmedShares] = useState<{ totalCents: number; categoryCents: Array<{ category: string; cents: number }> }>({
     totalCents: 0,
     categoryCents: [],
   });
-  const monthStart = getThisMonthStart();
+  // Track whether confirmed data has loaded for the current period to avoid flicker
+  const [confirmedLoaded, setConfirmedLoaded] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [excludeDeleted, setExcludeDeleted] = useState(false);
+  const prevPeriodRef = useRef(period);
+
+  const { startMs, endMs } = useMemo(() => ({
+    startMs: getPeriodStart(period),
+    endMs: getPeriodEnd(period),
+  }), [period]);
+
+  const periodLabel = getPeriodLabel(period);
+
+  const selectPeriod = useCallback((p: SpendingPeriod) => {
+    setPeriod(p);
+    setMenuOpen(false);
+  }, []);
+
+  // Reset confirmed state when period changes to avoid stale data showing
+  if (prevPeriodRef.current !== period) {
+    prevPeriodRef.current = period;
+    setConfirmedLoaded(false);
+  }
+
   const loadConfirmed = useCallback(async () => {
     try {
       const [raw, withCategory] = await Promise.all([
-        getConfirmedFriendSharesRaw(monthStart),
-        getConfirmedSharesForMonth(monthStart),
+        getConfirmedFriendSharesForRange(startMs, endMs),
+        getConfirmedSharesForRange(startMs, endMs),
       ]);
       setConfirmedRaw({ totalCents: raw.totalCents });
       setConfirmedShares({ totalCents: withCategory.totalCents, categoryCents: withCategory.categoryCents });
     } catch {
       setConfirmedRaw({ totalCents: 0 });
       setConfirmedShares({ totalCents: 0, categoryCents: [] });
+    } finally {
+      setConfirmedLoaded(true);
     }
-  }, [monthStart]);
+  }, [startMs, endMs]);
+
   useFocusEffect(useCallback(() => {
     loadConfirmed();
   }, [loadConfirmed]));
-  const thisMonth = getSplitsThisMonth(splits);
-  const ownerCentsTotal = getUserSpendingCents(thisMonth);
-  const totalCents = ownerCentsTotal + confirmedRaw.totalCents;
-  const ownCategoryTotals = getCategoryTotals(thisMonth);
-  const mergedCategoryTotals = mergeCategoryTotals(ownCategoryTotals, confirmedShares.categoryCents, totalCents);
+
+  const filteredSplits = excludeDeleted ? splits.filter((s) => !s.isDeleted) : splits;
+  const periodSplits = getSplitsInRange(filteredSplits, startMs, endMs);
+  const ownerCentsTotal = getUserSpendingCents(periodSplits);
+  const totalCents = ownerCentsTotal + (confirmedLoaded ? confirmedRaw.totalCents : 0);
+  const ownCategoryTotals = getCategoryTotals(periodSplits);
+  const mergedCategoryTotals = confirmedLoaded
+    ? mergeCategoryTotals(ownCategoryTotals, confirmedShares.categoryCents, totalCents)
+    : ownCategoryTotals.map((c) => ({ ...c, percent: ownerCentsTotal > 0 ? (c.cents / ownerCentsTotal) * 100 : 0 }));
   const hasData = totalCents > 0;
 
   const donutSegments: DonutSegment[] = mergedCategoryTotals
@@ -82,12 +123,55 @@ export default function SpendingScreen() {
       color: getCategoryColor(c.category),
     }));
 
+  const isLoading = loading || !confirmedLoaded;
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
-        <Text style={styles.title}>Spending</Text>
-        <Text style={styles.subtitle}>Your share of this month's splits</Text>
-        {loading ? (
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.title}>Spending</Text>
+            <Text style={styles.subtitle}>Your share of splits</Text>
+          </View>
+          <View>
+            <Pressable
+              style={({ pressed }) => [styles.periodButton, pressed && { opacity: 0.7 }]}
+              onPress={() => setMenuOpen(true)}
+              hitSlop={hitSlop}
+              accessibilityRole="button"
+              accessibilityLabel={`Change period, currently ${PERIOD_MENU_LABELS[period]}`}
+            >
+              <Text style={styles.periodButtonText}>{PERIOD_MENU_LABELS[period]}</Text>
+              <Ionicons name="calendar-outline" size={20} color="#fff" />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Period dropdown */}
+        <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+          <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
+            <View style={styles.menuContainer}>
+              {PERIODS.map((p) => (
+                <Pressable
+                  key={p}
+                  style={({ pressed }) => [
+                    styles.menuItem,
+                    period === p && styles.menuItemActive,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                  onPress={() => selectPeriod(p)}
+                >
+                  <Text style={[styles.menuItemText, period === p && styles.menuItemTextActive]}>
+                    {PERIOD_MENU_LABELS[p]}
+                  </Text>
+                  {period === p && <Ionicons name="checkmark" size={18} color="#fff" />}
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
+        </Modal>
+
+        {isLoading ? (
           <Text style={styles.muted}>Loading...</Text>
         ) : (
           <>
@@ -97,11 +181,12 @@ export default function SpendingScreen() {
                   segments={donutSegments}
                   totalCents={totalCents}
                   formatCurrency={formatCurrency}
+                  periodLabel={periodLabel}
                 />
               ) : (
                 <>
                   <Text style={styles.totalAmount}>{formatCurrency(0)}</Text>
-                  <Text style={styles.totalLabel}>This month</Text>
+                  <Text style={styles.totalLabel}>{periodLabel}</Text>
                 </>
               )}
             </View>
@@ -125,10 +210,19 @@ export default function SpendingScreen() {
               </View>
             ) : (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No spending this month yet.</Text>
+                <Text style={styles.emptyText}>No spending {periodLabel.toLowerCase()} yet.</Text>
                 <Text style={styles.emptySubtext}>Splits you add will show here by category.</Text>
               </View>
             )}
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>Exclude deleted splits</Text>
+              <Switch
+                value={excludeDeleted}
+                onValueChange={setExcludeDeleted}
+                trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#34C759' }}
+                thumbColor="#fff"
+              />
+            </View>
           </>
         )}
       </View>
@@ -139,8 +233,63 @@ export default function SpendingScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
   container: { flex: 1, padding: 20, paddingTop: 16 },
-  title: { fontSize: 28, fontWeight: '600', color: '#fff', marginBottom: 8 },
-  subtitle: { color: 'rgba(255,255,255,0.6)', marginBottom: 24 },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 24,
+  },
+  title: { fontSize: 28, fontWeight: '600', color: '#fff', marginBottom: 4 },
+  subtitle: { color: 'rgba(255,255,255,0.6)' },
+  periodButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginTop: 4,
+  },
+  periodButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  menuBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 100,
+    paddingRight: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  menuContainer: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 12,
+    minWidth: 160,
+    overflow: 'hidden',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  menuItemActive: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  menuItemText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 16,
+  },
+  menuItemTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
   muted: { color: 'rgba(255,255,255,0.6)' },
   totalCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
@@ -176,4 +325,20 @@ const styles = StyleSheet.create({
   emptyState: { paddingVertical: 32, alignItems: 'center' },
   emptyText: { color: 'rgba(255,255,255,0.6)', fontSize: 16 },
   emptySubtext: { color: 'rgba(255,255,255,0.4)', fontSize: 14, marginTop: 8 },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  toggleLabel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 15,
+  },
 });

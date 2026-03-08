@@ -10,8 +10,11 @@ import {
   getAssignmentFrequency,
   suggestAssignments,
   updateAssignmentFrequency,
+  migrateFrequencyIfNeeded,
+  CONFIDENCE_THRESHOLD,
   type AssignmentSuggestion,
 } from '../../lib/assignmentSuggestions';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface AssignScreenProps {
   split: Split;
@@ -21,27 +24,31 @@ interface AssignScreenProps {
 }
 
 export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenProps) {
+  const { userId } = useAuth();
   const [suggestions, setSuggestions] = useState<Map<string, AssignmentSuggestion>>(new Map());
 
   useEffect(() => {
+    if (!userId) return;
     let cancelled = false;
-    getAssignmentFrequency().then((freq) => {
+    (async () => {
+      await migrateFrequencyIfNeeded(userId);
+      const freq = await getAssignmentFrequency(userId);
       if (cancelled) return;
       const map = suggestAssignments(split, freq);
       setSuggestions(map);
-    });
+    })();
     return () => {
       cancelled = true;
     };
-  }, [split.id, split.items.length, split.participants.length]);
+  }, [userId, split.id, split.items.length, split.participants.length]);
 
   const runningTally = getRunningTally(split);
   const allAssigned = allItemsAssigned(split);
   const unassignedItems = split.items.filter((item) => item.assignments.length === 0);
-  const hasAnySuggestion = Array.from(suggestions.values()).some((s) => s.confidence > 0);
+  const hasAnySuggestion = Array.from(suggestions.values()).some((s) => s.confidence >= CONFIDENCE_THRESHOLD);
   const suggestedButNotApplied = split.items.some((item) => {
     const sug = suggestions.get(item.id);
-    return sug && sug.confidence > 0 && sug.assignments.length > 0 && item.assignments.length === 0;
+    return sug && sug.confidence >= CONFIDENCE_THRESHOLD && sug.assignments.length > 0 && item.assignments.length === 0;
   });
 
   const applySuggestionForItem = useCallback(
@@ -61,7 +68,7 @@ export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenPr
   const confirmAllSuggestions = useCallback(() => {
     const nextItems = split.items.map((item) => {
       const sug = suggestions.get(item.id);
-      if (sug && sug.confidence > 0 && sug.assignments.length > 0) {
+      if (sug && sug.confidence >= CONFIDENCE_THRESHOLD && sug.assignments.length > 0) {
         return { ...item, assignments: [...sug.assignments] };
       }
       return item;
@@ -70,9 +77,11 @@ export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenPr
   }, [split, suggestions, onUpdate]);
 
   const handleNext = useCallback(async () => {
-    await updateAssignmentFrequency(split.items, split.participants);
+    if (userId) {
+      await updateAssignmentFrequency(userId, split.items, split.participants);
+    }
     onNext();
-  }, [split.items, split.participants, onNext]);
+  }, [userId, split.items, split.participants, onNext]);
 
   const toggleAssignment = (itemId: string, participantId: string) => {
     const item = split.items.find((i) => i.id === itemId);
@@ -154,7 +163,7 @@ export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenPr
           const itemTotal = item.priceInCents * item.quantity;
           const hasAssignment = item.assignments.length > 0;
           const sug = suggestions.get(item.id);
-          const hasSuggestion = sug && sug.confidence > 0 && sug.assignments.length > 0;
+          const hasSuggestion = sug && sug.confidence >= CONFIDENCE_THRESHOLD && sug.assignments.length > 0;
           const suggestedNames =
             hasSuggestion && split.participants.length
               ? sug!.assignments

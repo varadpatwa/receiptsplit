@@ -73,6 +73,7 @@ function rowToSplit(row: {
   id: string;
   title: string;
   exclude_me: boolean;
+  is_deleted?: boolean;
   participants: Participant[];
   created_at: string;
   split_data: any;
@@ -91,6 +92,7 @@ function rowToSplit(row: {
     currentStep: row.split_data?.currentStep ?? 'receipt',
     category: row.split_data?.category,
     excludeMe: row.exclude_me,
+    isDeleted: row.is_deleted ?? false,
   });
 }
 
@@ -188,7 +190,10 @@ export async function updateSplit(split: Split): Promise<Split> {
   return saved;
 }
 
-export async function deleteSplit(splitId: string): Promise<void> {
-  const { error } = await supabase.from('splits').delete().eq('id', splitId);
+export async function softDeleteSplit(splitId: string): Promise<void> {
+  const { error } = await supabase
+    .from('splits')
+    .update({ is_deleted: true })
+    .eq('id', splitId);
   if (error) throw new Error(`Failed to delete split: ${error.message}`);
 }

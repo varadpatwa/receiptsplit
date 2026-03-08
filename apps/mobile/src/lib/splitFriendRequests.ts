@@ -315,3 +315,66 @@ export async function getConfirmedShareAmountCentsForMonth(monthStartMs: number)
   const { totalCents } = await getConfirmedSharesForMonth(monthStartMs);
   return totalCents;
 }
+
+/**
+ * Confirmed share totals for the current user in a date range [startMs, endMs),
+ * with category breakdown. Works for daily/weekly/monthly periods.
+ */
+export async function getConfirmedSharesForRange(
+  startMs: number,
+  endMs: number
+): Promise<ConfirmedSharesForMonth> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { totalCents: 0, categoryCents: [], rowCount: 0 };
+  const startIso = new Date(startMs).toISOString();
+  const endIso = new Date(endMs).toISOString();
+  const { data: rows, error } = await supabase
+    .from('split_friend_requests')
+    .select('split_id, share_amount, created_at, split:splits(split_data)')
+    .eq('friend_user_id', user.id)
+    .eq('status', 'confirmed')
+    .gte('created_at', startIso)
+    .lt('created_at', endIso);
+  if (error) throw new Error(`Failed to load confirmed shares: ${error.message}`);
+  const list = rows ?? [];
+  if (list.length === 0) return { totalCents: 0, categoryCents: [], rowCount: 0 };
+  const byCategory = new Map<string, number>();
+  let totalCents = 0;
+  const SHARED_LABEL = 'Shared';
+  for (const r of list as any[]) {
+    const cents = Math.round(Number(r.share_amount));
+    totalCents += cents;
+    const category =
+      (r.split?.split_data?.category as string) ?? (r.split?.category as string) ?? SHARED_LABEL;
+    byCategory.set(category, (byCategory.get(category) ?? 0) + cents);
+  }
+  const categoryCents = Array.from(byCategory.entries())
+    .map(([category, cents]) => ({ category, cents }))
+    .sort((a, b) => b.cents - a.cents);
+  return { totalCents, categoryCents, rowCount: list.length };
+}
+
+/**
+ * Raw confirmed friend shares total for a date range [startMs, endMs).
+ */
+export async function getConfirmedFriendSharesForRange(
+  startMs: number,
+  endMs: number
+): Promise<ConfirmedFriendSharesRaw> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { authUid: null, rowCount: 0, totalCents: 0 };
+  const startIso = new Date(startMs).toISOString();
+  const endIso = new Date(endMs).toISOString();
+  let query = supabase
+    .from('split_friend_requests')
+    .select('share_amount, created_at')
+    .eq('friend_user_id', user.id)
+    .eq('status', 'confirmed')
+    .gte('created_at', startIso)
+    .lt('created_at', endIso);
+  const { data: rows, error } = await query;
+  if (error) throw new Error(`Failed to load confirmed shares: ${error.message}`);
+  const list = rows ?? [];
+  const totalCents = list.reduce((sum, r) => sum + Math.round(Number((r as { share_amount: number }).share_amount)), 0);
+  return { authUid: user.id, rowCount: list.length, totalCents };
+}

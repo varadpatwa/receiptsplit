@@ -31,6 +31,7 @@ export interface Split {
   currentStep: 'receipt' | 'people' | 'assign' | 'summary' | 'export';
   category?: SplitCategory;
   excludeMe?: boolean;
+  isDeleted?: boolean;
 }
 
 export interface ParticipantBreakdown {

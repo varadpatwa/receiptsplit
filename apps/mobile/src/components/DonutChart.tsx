@@ -19,9 +19,10 @@ interface DonutChartProps {
   segments: DonutSegment[];
   totalCents: number;
   formatCurrency: (cents: number) => string;
+  periodLabel?: string;
 }
 
-export function DonutChart({ segments, totalCents, formatCurrency }: DonutChartProps) {
+export function DonutChart({ segments, totalCents, formatCurrency, periodLabel = 'This month' }: DonutChartProps) {
   const filtered = segments.filter((s) => s.cents > 0);
   const circumference = 2 * Math.PI * DONUT_R;
   let offset = 0;
@@ -64,7 +65,7 @@ export function DonutChart({ segments, totalCents, formatCurrency }: DonutChartP
         </Svg>
         <View style={styles.centerLabel} pointerEvents="none">
           <Text style={styles.centerAmount}>{formatCurrency(totalCents)}</Text>
-          <Text style={styles.centerSubtext}>This month</Text>
+          <Text style={styles.centerSubtext}>{periodLabel}</Text>
         </View>
       </View>
     </View>
