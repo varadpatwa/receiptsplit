@@ -1,5 +1,5 @@
-import type { Split } from './types';
-import { getReceiptTotal } from './receiptTotal';
+import type { Split } from './types.js';
+import { getReceiptTotal } from './receiptTotal.js';
 
 export type CategoryKey = string;
 

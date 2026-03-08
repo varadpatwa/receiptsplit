@@ -49,7 +49,7 @@ export async function isHandleAvailable(handle: string): Promise<boolean> {
   const handleLower = handle.toLowerCase().trim();
   const { data, error } = await supabase.from('profiles').select('id').eq('handle', handleLower).maybeSingle();
   if (error) throw new Error(error.message);
-  return !data || (user && data.id === user.id);
+  return !data || (!!user && data.id === user.id);
 }
 
 export async function searchProfilesByHandle(prefix: string, limit = 10): Promise<Profile[]> {

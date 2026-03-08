@@ -26,16 +26,22 @@ const BUCKET = 'receipts';
 
 /**
  * Upload file to receipts/{userId}/{timestamp}.jpg and return storage path.
+ * Uses FormData with the React Native file object pattern for reliable uploads.
  */
 export async function uploadReceiptImage(uri: string, userId: string): Promise<string> {
   const timestamp = Date.now();
   const path = `${userId}/${timestamp}.jpg`;
 
-  const response = await fetch(uri);
-  const blob = await response.blob();
+  // React Native: create a file-like object that Supabase upload can handle
+  const formData = new FormData();
+  formData.append('file', {
+    uri,
+    name: `${timestamp}.jpg`,
+    type: 'image/jpeg',
+  } as unknown as Blob);
 
-  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
-    contentType: 'image/jpeg',
+  const { error } = await supabase.storage.from(BUCKET).upload(path, formData, {
+    contentType: 'multipart/form-data',
     upsert: false,
   });
 

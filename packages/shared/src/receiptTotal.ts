@@ -1,4 +1,4 @@
-import type { Split } from './types';
+import type { Split } from './types.js';
 
 /**
  * Get total receipt amount in cents (items + tax + tip). Pure; no DOM.

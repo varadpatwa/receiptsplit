@@ -5,7 +5,7 @@ import { upsertProfile, isHandleAvailable } from '../lib/supabase';
 import { useProfileRefresh } from '../contexts/ProfileRefreshContext';
 
 export default function OnboardingUsernameScreen() {
-  const refreshProfile = useProfileRefresh();
+  const profileRefresh = useProfileRefresh();
   const [handle, setHandle] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -47,7 +47,7 @@ export default function OnboardingUsernameScreen() {
         return;
       }
       await upsertProfile(handle, displayName || undefined);
-      if (refreshProfile) await refreshProfile();
+      if (profileRefresh) await profileRefresh.refreshProfile();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create profile');
     } finally {

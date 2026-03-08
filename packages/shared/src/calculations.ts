@@ -1,5 +1,5 @@
-import type { Split, ParticipantBreakdown, ItemAssignment } from './types';
-import { getReceiptTotal } from './receiptTotal';
+import type { Split, ParticipantBreakdown, ItemAssignment } from './types.js';
+import { getReceiptTotal } from './receiptTotal.js';
 
 const safeNumber = (value: number | undefined | null): number => {
   if (value == null || !Number.isFinite(value)) return 0;
