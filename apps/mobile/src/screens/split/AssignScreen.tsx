@@ -46,10 +46,11 @@ export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenPr
   const allAssigned = allItemsAssigned(split);
   const unassignedItems = split.items.filter((item) => item.assignments.length === 0);
   const hasAnySuggestion = Array.from(suggestions.values()).some((s) => s.confidence >= CONFIDENCE_THRESHOLD);
-  const suggestedButNotApplied = split.items.some((item) => {
+  const suggestedNotAppliedCount = split.items.filter((item) => {
     const sug = suggestions.get(item.id);
     return sug && sug.confidence >= CONFIDENCE_THRESHOLD && sug.assignments.length > 0 && item.assignments.length === 0;
-  });
+  }).length;
+  const suggestedButNotApplied = suggestedNotAppliedCount > 0;
 
   const applySuggestionForItem = useCallback(
     (itemId: string) => {
@@ -123,12 +124,14 @@ export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenPr
             <View style={styles.suggestionBannerText}>
               <Text style={styles.suggestionBannerTitle}>Suggested split generated</Text>
               <Text style={styles.suggestionBannerSub}>
-                Tap &quot;Use suggestion&quot; on an item or confirm all below.
+                {suggestedButNotApplied
+                  ? `${suggestedNotAppliedCount} item${suggestedNotAppliedCount === 1 ? '' : 's'} ready to auto-assign`
+                  : 'All suggestions applied'}
               </Text>
             </View>
             {suggestedButNotApplied && (
               <Pressable onPress={confirmAllSuggestions} style={styles.confirmSuggestionsBtn}>
-                <Text style={styles.confirmSuggestionsBtnText}>Confirm suggestions</Text>
+                <Text style={styles.confirmSuggestionsBtnText}>Apply All</Text>
               </Pressable>
             )}
           </View>
@@ -171,6 +174,7 @@ export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenPr
                   .filter(Boolean)
                   .join(', ')
               : '';
+          const confidenceLabel = sug && sug.confidence >= 0.8 ? 'High' : sug && sug.confidence >= 0.65 ? 'Medium' : '';
           return (
             <View key={item.id} style={[styles.itemCard, !hasAssignment && styles.itemCardUnassigned]}>
               <View style={styles.itemHeader}>
@@ -199,6 +203,11 @@ export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenPr
                   <Text style={styles.useSuggestionText}>
                     Use suggestion: {suggestedNames || 'Split'}
                   </Text>
+                  {confidenceLabel ? (
+                    <View style={[styles.confidenceBadge, sug!.confidence >= 0.8 ? styles.confidenceHigh : styles.confidenceMedium]}>
+                      <Text style={styles.confidenceBadgeText}>{confidenceLabel}</Text>
+                    </View>
+                  ) : null}
                 </Pressable>
               )}
               <Text style={styles.whoShared}>Who shared this?</Text>
@@ -296,7 +305,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(34,197,94,0.25)',
   },
-  useSuggestionText: { fontSize: 14, color: 'rgba(34,197,94,0.95)', fontWeight: '500' },
+  useSuggestionText: { fontSize: 14, color: 'rgba(34,197,94,0.95)', fontWeight: '500', flex: 1 },
+  confidenceBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 9999 },
+  confidenceHigh: { backgroundColor: 'rgba(34,197,94,0.2)' },
+  confidenceMedium: { backgroundColor: 'rgba(255,200,0,0.15)' },
+  confidenceBadgeText: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.7)' },
   itemCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,

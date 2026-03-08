@@ -197,3 +197,11 @@ export async function softDeleteSplit(splitId: string): Promise<void> {
     .eq('id', splitId);
   if (error) throw new Error(`Failed to delete split: ${error.message}`);
 }
+
+export async function restoreSplit(splitId: string): Promise<void> {
+  const { error } = await supabase
+    .from('splits')
+    .update({ is_deleted: false })
+    .eq('id', splitId);
+  if (error) throw new Error(`Failed to restore split: ${error.message}`);
+}

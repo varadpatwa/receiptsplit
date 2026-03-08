@@ -6,7 +6,6 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,6 +25,7 @@ import {
   type PendingSplitRequest,
 } from '../lib/splitFriendRequests';
 import { useFriendRequests } from '../contexts/FriendRequestsContext';
+import { useToast } from '../contexts/ToastContext';
 import { formatCurrency } from '@receiptsplit/shared';
 
 const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
@@ -33,6 +33,7 @@ const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
 export default function NotificationsScreen() {
   const navigation = useNavigation();
   const { refreshPendingCount } = useFriendRequests();
+  const { showToast } = useToast();
   const [incoming, setIncoming] = useState<FriendRequest[]>([]);
   const [outgoing, setOutgoing] = useState<FriendRequest[]>([]);
   const [splitRequests, setSplitRequests] = useState<PendingSplitRequest[]>([]);
@@ -84,13 +85,14 @@ export default function NotificationsScreen() {
         await acceptFriendRequest(requestId);
         setIncoming((prev) => prev.filter((r) => r.id !== requestId));
         await refreshPendingCount();
+        showToast({ message: 'Friend request accepted', variant: 'success' });
       } catch (e) {
-        Alert.alert('Error', e instanceof Error ? e.message : 'Failed to accept');
+        showToast({ message: e instanceof Error ? e.message : 'Failed to accept', variant: 'error' });
       } finally {
         setActingId(null);
       }
     },
-    [refreshPendingCount]
+    [refreshPendingCount, showToast]
   );
 
   const handleDecline = useCallback(
@@ -100,13 +102,14 @@ export default function NotificationsScreen() {
         await rejectFriendRequest(requestId);
         setIncoming((prev) => prev.filter((r) => r.id !== requestId));
         await refreshPendingCount();
+        showToast({ message: 'Friend request declined', variant: 'info' });
       } catch (e) {
-        Alert.alert('Error', e instanceof Error ? e.message : 'Failed to decline');
+        showToast({ message: e instanceof Error ? e.message : 'Failed to decline', variant: 'error' });
       } finally {
         setActingId(null);
       }
     },
-    [refreshPendingCount]
+    [refreshPendingCount, showToast]
   );
 
   const handleSplitAccept = useCallback(
@@ -117,13 +120,14 @@ export default function NotificationsScreen() {
         await confirmSplitRequest(splitId, friendUserId);
         setSplitRequests((prev) => prev.filter((r) => r.split_id !== splitId || r.friend_user_id !== friendUserId));
         await refreshPendingCount();
+        showToast({ message: 'Split confirmed', variant: 'success' });
       } catch (e) {
-        Alert.alert('Error', e instanceof Error ? e.message : 'Failed to accept');
+        showToast({ message: e instanceof Error ? e.message : 'Failed to accept', variant: 'error' });
       } finally {
         setActingSplitKey(null);
       }
     },
-    [refreshPendingCount]
+    [refreshPendingCount, showToast]
   );
 
   const handleSplitReject = useCallback(
@@ -134,17 +138,17 @@ export default function NotificationsScreen() {
         await rejectSplitRequest(splitId, friendUserId);
         setSplitRequests((prev) => prev.filter((r) => r.split_id !== splitId || r.friend_user_id !== friendUserId));
         await refreshPendingCount();
+        showToast({ message: 'Split rejected', variant: 'info' });
       } catch (e) {
-        Alert.alert('Error', e instanceof Error ? e.message : 'Failed to reject');
+        showToast({ message: e instanceof Error ? e.message : 'Failed to reject', variant: 'error' });
       } finally {
         setActingSplitKey(null);
       }
     },
-    [refreshPendingCount]
+    [refreshPendingCount, showToast]
   );
 
   const isEmpty = incoming.length === 0 && outgoing.length === 0 && splitRequests.length === 0;
-  const emptyMessage = 'No recent notifications';
 
   function formatSplitDate(iso: string): string {
     const d = new Date(iso);
@@ -186,7 +190,9 @@ export default function NotificationsScreen() {
           >
             {isEmpty ? (
               <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>{emptyMessage}</Text>
+                <Ionicons name="notifications-off-outline" size={40} color="rgba(255,255,255,0.2)" style={{ marginBottom: 12 }} />
+                <Text style={styles.emptyTitle}>All caught up</Text>
+                <Text style={styles.emptySubtext}>Friend requests and split confirmations will appear here.</Text>
               </View>
             ) : (
               <>
@@ -323,7 +329,8 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
   },
-  emptyTitle: { fontSize: 16, color: 'rgba(255,255,255,0.6)' },
+  emptyTitle: { fontSize: 18, fontWeight: '600', color: '#fff', marginBottom: 8 },
+  emptySubtext: { fontSize: 14, color: 'rgba(255,255,255,0.4)', textAlign: 'center' },
   errorCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,

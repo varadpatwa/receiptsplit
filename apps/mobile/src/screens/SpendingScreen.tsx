@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Modal, Switch } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, Switch, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -53,7 +53,7 @@ function mergeCategoryTotals(
 const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
 
 export default function SpendingScreen() {
-  const { splits, loading } = useSplits();
+  const { splits, loading, refetch } = useSplits();
   const [period, setPeriod] = useState<SpendingPeriod>('weekly');
   const [confirmedRaw, setConfirmedRaw] = useState<{ totalCents: number }>({ totalCents: 0 });
   const [confirmedShares, setConfirmedShares] = useState<{ totalCents: number; categoryCents: Array<{ category: string; cents: number }> }>({
@@ -64,6 +64,8 @@ export default function SpendingScreen() {
   const [confirmedLoaded, setConfirmedLoaded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [excludeDeleted, setExcludeDeleted] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const prevPeriodRef = useRef(period);
 
   const { startMs, endMs } = useMemo(() => ({
@@ -97,12 +99,19 @@ export default function SpendingScreen() {
       setConfirmedShares({ totalCents: 0, categoryCents: [] });
     } finally {
       setConfirmedLoaded(true);
+      setLastUpdated(new Date());
     }
   }, [startMs, endMs]);
 
   useFocusEffect(useCallback(() => {
     loadConfirmed();
   }, [loadConfirmed]));
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([refetch(), loadConfirmed()]);
+    setRefreshing(false);
+  }, [refetch, loadConfirmed]);
 
   const filteredSplits = excludeDeleted ? splits.filter((s) => !s.isDeleted) : splits;
   const periodSplits = getSplitsInRange(filteredSplits, startMs, endMs);
@@ -125,9 +134,17 @@ export default function SpendingScreen() {
 
   const isLoading = loading || !confirmedLoaded;
 
+  const lastUpdatedLabel = lastUpdated
+    ? `Updated ${lastUpdated.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+    : '';
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <View style={styles.container}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="rgba(255,255,255,0.6)" />}
+      >
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.title}>Spending</Text>
@@ -172,7 +189,9 @@ export default function SpendingScreen() {
         </Modal>
 
         {isLoading ? (
-          <Text style={styles.muted}>Loading...</Text>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="rgba(255,255,255,0.6)" />
+          </View>
         ) : (
           <>
             <View style={styles.totalCard}>
@@ -225,14 +244,18 @@ export default function SpendingScreen() {
             </View>
           </>
         )}
-      </View>
+        {lastUpdatedLabel ? (
+          <Text style={styles.lastUpdated}>{lastUpdatedLabel}</Text>
+        ) : null}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
-  container: { flex: 1, padding: 20, paddingTop: 16 },
+  container: { flex: 1 },
+  scrollContent: { padding: 20, paddingTop: 16, paddingBottom: 40 },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -291,6 +314,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   muted: { color: 'rgba(255,255,255,0.6)' },
+  loadingContainer: { paddingTop: 60, alignItems: 'center' },
   totalCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
@@ -340,5 +364,11 @@ const styles = StyleSheet.create({
   toggleLabel: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 15,
+  },
+  lastUpdated: {
+    textAlign: 'center',
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 12,
+    marginTop: 16,
   },
 });

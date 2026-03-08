@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { FriendRequestsProvider } from './src/contexts/FriendRequestsContext';
 import { ProfileRefreshProvider } from './src/contexts/ProfileRefreshContext';
 import { SplitsProvider } from './src/contexts/SplitsContext';
+import { ToastProvider } from './src/contexts/ToastContext';
 import { getProfile } from './src/lib/supabase';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
@@ -70,9 +71,11 @@ function AppNavigator() {
   return (
     <FriendRequestsProvider>
       <SplitsProvider>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Main" component={MainTabs} />
-        </Stack.Navigator>
+        <ToastProvider>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Main" component={MainTabs} />
+          </Stack.Navigator>
+        </ToastProvider>
       </SplitsProvider>
     </FriendRequestsProvider>
   );

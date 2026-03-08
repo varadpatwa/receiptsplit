@@ -1,11 +1,12 @@
 import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
+import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { getReceiptTotal, formatCurrency } from '@receiptsplit/shared';
 import { useSplits } from '../contexts/SplitsContext';
 import { useFriendRequests } from '../contexts/FriendRequestsContext';
+import { useToast } from '../contexts/ToastContext';
 import { SwipeableRow } from '../components/SwipeableRow';
 import type { Split } from '@receiptsplit/shared';
 import type { HomeStackParamList } from '../navigation/HomeStack';
@@ -21,8 +22,9 @@ function formatDate(ts: number): string {
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'HomeList'>;
 
 export default function HomeScreen() {
-  const { activeSplits, loading, createNewSplit, loadSplit, saveSplit, deleteSplit, saveError, clearSaveError } = useSplits();
+  const { activeSplits, loading, createNewSplit, loadSplit, saveSplit, deleteSplit, restoreSplit, saveError, clearSaveError } = useSplits();
   const { pendingIncomingCount, pendingSplitCount, refreshPendingCount } = useFriendRequests();
+  const { showToast } = useToast();
   const totalBadgeCount = pendingIncomingCount + pendingSplitCount;
   const navigation = useNavigation<Nav>();
 
@@ -97,7 +99,9 @@ export default function HomeScreen() {
       </Pressable>
       <Text style={styles.sectionTitle}>Recent Splits</Text>
       {loading ? (
-        <Text style={styles.muted}>Loading...</Text>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="rgba(255,255,255,0.6)" />
+        </View>
       ) : sorted.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>No splits yet</Text>
@@ -108,7 +112,15 @@ export default function HomeScreen() {
           data={sorted}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <SwipeableRow onDelete={() => deleteSplit(item.id)}>
+            <SwipeableRow onDelete={() => {
+              deleteSplit(item.id);
+              showToast({
+                message: `"${item.name}" deleted`,
+                variant: 'info',
+                duration: 6000,
+                action: { label: 'Undo', onPress: () => restoreSplit(item.id) },
+              });
+            }}>
               <Pressable
                 style={({ pressed }) => [styles.card, pressed && { opacity: 0.8 }]}
                 onPress={() => onSplitPress(item)}
@@ -165,6 +177,7 @@ const styles = StyleSheet.create({
   },
   newSplitText: { color: '#000', fontSize: 16, fontWeight: '600' },
   sectionTitle: { fontSize: 18, fontWeight: '600', color: '#fff', marginBottom: 12 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 },
   list: { flex: 1 },
   card: {
     backgroundColor: 'rgba(255,255,255,0.05)',

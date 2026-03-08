@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -219,7 +219,7 @@ export default function FriendsScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Friends</Text>
         {loading && friends.length === 0 ? (
-          <Text style={styles.muted}>Loading...</Text>
+          <ActivityIndicator size="small" color="rgba(255,255,255,0.6)" style={{ paddingVertical: 16 }} />
         ) : friends.length === 0 ? (
           <Text style={styles.muted}>
             {userId ? 'No friends yet. Search above to find friends.' : 'Sign in to see your friends'}

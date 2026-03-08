@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type { Split } from '@receiptsplit/shared';
 import { generateUuid } from '@receiptsplit/shared';
 import { useAuth } from './AuthContext';
-import { listSplits, createSplit, updateSplit, softDeleteSplit } from '../lib/splits';
+import { listSplits, createSplit, updateSplit, softDeleteSplit, restoreSplit as restoreSplitApi } from '../lib/splits';
 
 type SplitsContextValue = {
   /** All splits including soft-deleted (for spending calculations). */
@@ -18,6 +18,7 @@ type SplitsContextValue = {
   loadSplit: (splitId: string) => void;
   saveSplit: (split: Split, immediate?: boolean) => Promise<void>;
   deleteSplit: (splitId: string) => Promise<void>;
+  restoreSplit: (splitId: string) => Promise<void>;
   updateCurrentSplit: (updater: (split: Split) => Split, immediate?: boolean) => void;
   clearCurrentSplit: () => void;
 };
@@ -151,6 +152,24 @@ export function SplitsProvider({ children }: { children: React.ReactNode }) {
     [userId, currentSplit?.id]
   );
 
+  const restoreSplit = useCallback(
+    async (splitId: string) => {
+      // Optimistic: mark as not deleted locally
+      setSplits((prev) =>
+        prev.map((s) => (s.id === splitId ? { ...s, isDeleted: false } : s))
+      );
+      try {
+        await restoreSplitApi(splitId);
+      } catch {
+        // Revert on failure
+        setSplits((prev) =>
+          prev.map((s) => (s.id === splitId ? { ...s, isDeleted: true } : s))
+        );
+      }
+    },
+    []
+  );
+
   const activeSplits = splits.filter((s) => !s.isDeleted);
 
   const updateCurrentSplit = useCallback(
@@ -175,6 +194,7 @@ export function SplitsProvider({ children }: { children: React.ReactNode }) {
     loadSplit,
     saveSplit,
     deleteSplit,
+    restoreSplit,
     updateCurrentSplit,
     clearCurrentSplit,
   };
