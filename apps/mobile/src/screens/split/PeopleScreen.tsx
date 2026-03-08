@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { Split, Participant } from '@receiptsplit/shared';
 import { generateId } from '@receiptsplit/shared';
-import { listFriends, getFriendByHandle, type Friend } from '../../lib/friends';
+import { listFriends, type Friend } from '../../lib/friends';
 import { getRecentPeople, recordRecentPerson } from '../../lib/recentPeople';
 import { useAuth } from '../../contexts/AuthContext';
 import { Stepper } from '../../components/Stepper';
@@ -21,8 +21,7 @@ import { Stepper } from '../../components/Stepper';
 type Suggestion =
   | { type: 'friend'; friend: Friend }
   | { type: 'recent'; name: string }
-  | { type: 'add-temp'; name: string }
-  | { type: 'add-friend'; name: string };
+  | { type: 'add-temp'; name: string };
 
 interface PeopleScreenProps {
   split: Split;
@@ -67,6 +66,7 @@ export function PeopleScreen({ split, onUpdate, onNext, onBack }: PeopleScreenPr
     [recentPeople, currentParticipantNamesLower]
   );
 
+  // Names of matched friends (lowercase) so we can de-dupe recent entries
   const suggestions = useMemo((): Suggestion[] => {
     const query = newName.trim().toLowerCase();
     if (!query) return [];
@@ -82,20 +82,27 @@ export function PeopleScreen({ split, onUpdate, onNext, onBack }: PeopleScreenPr
     });
     friendPrefix.forEach((f) => result.push({ type: 'friend', friend: f }));
     friendContains.forEach((f) => result.push({ type: 'friend', friend: f }));
+    // Collect matched friend names so we skip duplicate recent entries
+    const matchedFriendNames = new Set(
+      [...friendPrefix, ...friendContains].flatMap((f) => [
+        f.handle.toLowerCase(),
+        (f.display_name ?? '').toLowerCase(),
+      ].filter(Boolean))
+    );
     const recentPrefix: string[] = [];
     const recentContains: string[] = [];
     availableRecent.forEach((name) => {
       const lower = name.toLowerCase();
+      // Skip recent if it matches a friend already shown
+      if (matchedFriendNames.has(lower)) return;
       if (lower.startsWith(query)) recentPrefix.push(name);
       else if (lower.includes(query)) recentContains.push(name);
     });
     recentPrefix.forEach((n) => result.push({ type: 'recent', name: n }));
     recentContains.forEach((n) => result.push({ type: 'recent', name: n }));
     if (newName.trim()) result.push({ type: 'add-temp', name: newName.trim() });
-    const exactMatch = savedFriends.find((f) => f.handle.toLowerCase() === newName.trim().toLowerCase());
-    if (newName.trim() && !exactMatch) result.push({ type: 'add-friend', name: newName.trim() });
     return result;
-  }, [newName, availableFriends, availableRecent, savedFriends]);
+  }, [newName, availableFriends, availableRecent]);
 
   const addParticipant = (participant: Participant) => {
     onUpdate({ ...split, participants: [...split.participants, participant] });
@@ -109,26 +116,20 @@ export function PeopleScreen({ split, onUpdate, onNext, onBack }: PeopleScreenPr
     addParticipant({ id: generateId(), name: trimmed, source: 'temp' });
   };
 
-  const addParticipantAsFriend = async (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    try {
-      const friend = await getFriendByHandle(trimmed);
-      if (friend) {
-        addParticipant({
-          id: friend.id,
-          name: friend.display_name || friend.handle,
-          source: 'friend',
-        });
-      } else {
-        addParticipantAsTemp(trimmed);
-      }
-    } catch {
-      addParticipantAsTemp(trimmed);
+  const addByNameOrFriend = (name: string) => {
+    // Check if this name matches a saved friend — use their stable UUID
+    const lower = name.toLowerCase();
+    const friend = savedFriends.find(
+      (f) => f.handle.toLowerCase() === lower || (f.display_name ?? '').toLowerCase() === lower
+    );
+    if (friend && !currentParticipantIds.has(friend.id)) {
+      addParticipant({ id: friend.id, name: friend.display_name || friend.handle, source: 'friend' });
+    } else {
+      addParticipantAsTemp(name);
     }
   };
 
-  const handleSuggestionSelect = async (s: Suggestion) => {
+  const handleSuggestionSelect = (s: Suggestion) => {
     switch (s.type) {
       case 'friend':
         addParticipant({
@@ -138,13 +139,10 @@ export function PeopleScreen({ split, onUpdate, onNext, onBack }: PeopleScreenPr
         });
         break;
       case 'recent':
-        addParticipantAsTemp(s.name);
+        addByNameOrFriend(s.name);
         break;
       case 'add-temp':
         addParticipantAsTemp(s.name);
-        break;
-      case 'add-friend':
-        await addParticipantAsFriend(s.name);
         break;
     }
   };
@@ -175,8 +173,7 @@ export function PeopleScreen({ split, onUpdate, onNext, onBack }: PeopleScreenPr
       displayText = item.friend.display_name || item.friend.handle;
       badge = '@' + item.friend.handle;
     } else if (item.type === 'recent') displayText = item.name;
-    else if (item.type === 'add-temp') displayText = `Add "${item.name}" as Temp`;
-    else displayText = `Add "${item.name}" as Friend`;
+    else displayText = `Add "${item.name}" as Temp`;
     return (
       <Pressable
         key={index}
@@ -231,7 +228,7 @@ export function PeopleScreen({ split, onUpdate, onNext, onBack }: PeopleScreenPr
                 {availableRecent.slice(0, 5).map((name) => (
                   <Pressable
                     key={name}
-                    onPress={() => addParticipantAsTemp(name)}
+                    onPress={() => addByNameOrFriend(name)}
                     style={({ pressed }) => [styles.recentChip, pressed && { opacity: 0.8 }]}
                   >
                     <Text style={styles.recentChipText}>{name}</Text>

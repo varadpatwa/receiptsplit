@@ -9,11 +9,10 @@
  * Confidence rules:
  * - 0.8: shared keyword match -> split evenly across all participants
  * - 0.7: alcohol keyword + frequency history match -> assign to most frequent person
- * - 0.5: generic frequency match (only if count >= 2 to avoid noise)
+ * - 0.65: generic frequency match (only if count >= 2 to avoid noise)
  * - 0.0: no match -> unassigned (user must manually assign)
  *
  * Threshold: only suggestions with confidence >= CONFIDENCE_THRESHOLD (0.6) are surfaced in the UI.
- * This means generic frequency matches (0.5) are NOT auto-suggested — only keyword + history matches.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -145,7 +144,7 @@ export async function migrateFrequencyIfNeeded(userId: string): Promise<void> {
  * - Shared keyword -> split evenly across all participants (confidence 0.8)
  * - Alcohol keyword + frequency history -> assign to most frequent non-"me" person (confidence 0.7)
  * - Alcohol keyword, no history -> unassigned (confidence 0)
- * - Generic item + strong frequency match (count >= MIN_FREQUENCY_COUNT) -> suggest (confidence 0.5)
+ * - Generic item + strong frequency match (count >= MIN_FREQUENCY_COUNT) -> suggest (confidence 0.65)
  * - No match -> unassigned (confidence 0)
  *
  * Note: "me" participant is excluded from frequency lookups to prevent self-assignment bias.
@@ -193,7 +192,7 @@ export function suggestAssignments(
     if (best && best.count >= MIN_FREQUENCY_COUNT) {
       result.set(item.id, {
         assignments: [{ participantId: best.id, shares: 1 }],
-        confidence: 0.5,
+        confidence: 0.65,
       });
       return;
     }
