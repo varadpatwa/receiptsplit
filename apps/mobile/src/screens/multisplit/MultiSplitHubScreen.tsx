@@ -22,7 +22,7 @@ interface Props {
   onBack: () => void;
 }
 
-const CATEGORIES: SplitCategory[] = ['Restaurant', 'Grocery', 'Entertainment', 'Utilities', 'Other'];
+const CATEGORIES: SplitCategory[] = ['Food', 'Grocery', 'Entertainment', 'Utilities', 'Other'];
 
 function ReceiptThumbnail({ storagePath }: { storagePath: string }) {
   const [url, setUrl] = useState<string | null>(null);

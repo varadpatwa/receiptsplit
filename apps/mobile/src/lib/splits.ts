@@ -88,7 +88,8 @@ function rowToSplit(row: {
 }): Split {
   const createdAt = new Date(row.created_at).getTime();
   const updatedAt = row.split_data?.updatedAt ?? createdAt;
-  const category = row.split_data?.category;
+  const rawCategory = row.split_data?.category;
+  const category = rawCategory === 'Restaurant' ? 'Food' : rawCategory;
   const merchantName = row.split_data?.merchantName;
   // Backfill auto-title for existing splits that don't have one
   const titleAuto = row.split_data?.titleAuto ?? generateAutoTitle({ merchantName, category, createdAt });

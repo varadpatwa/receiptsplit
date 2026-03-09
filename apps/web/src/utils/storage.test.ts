@@ -64,14 +64,14 @@ describe('storage', () => {
         taxInCents: 0,
         tipInCents: 0,
         currentStep: 'receipt',
-        category: 'Restaurant',
+        category: 'Food',
       };
 
       localStorageMock.setItem('receiptsplit:splits', JSON.stringify([splitWithCategory]));
 
       const loaded = loadSplits(null);
       expect(loaded).toHaveLength(1);
-      expect(loaded[0].category).toBe('Restaurant');
+      expect(loaded[0].category).toBe('Food');
     });
 
     it('should preserve missing categories for legacy splits', () => {
@@ -147,13 +147,13 @@ describe('storage', () => {
         taxInCents: 0,
         tipInCents: 0,
         currentStep: 'receipt',
-        category: 'Restaurant',
+        category: 'Food',
       };
 
       saveSplit(split, null);
       const loaded = loadSplits(null);
       expect(loaded).toHaveLength(1);
-      expect(loaded[0].category).toBe('Restaurant');
+      expect(loaded[0].category).toBe('Food');
     });
   });
 

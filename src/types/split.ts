@@ -17,7 +17,7 @@ export interface Participant {
   source?: 'friend' | 'temp';
 }
 
-export type SplitCategory = 'Restaurant' | 'Grocery' | 'Entertainment' | 'Utilities' | 'Other';
+export type SplitCategory = 'Food' | 'Grocery' | 'Entertainment' | 'Utilities' | 'Other';
 
 export interface Split {
   id: string;

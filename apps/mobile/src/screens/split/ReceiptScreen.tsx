@@ -29,7 +29,7 @@ import { Stepper } from '../../components/Stepper';
 import { useAuth } from '../../contexts/AuthContext';
 import { uploadReceiptImage, parseReceiptByPath, type TotalsMismatchWarning } from '../../lib/parseReceipt';
 
-const CATEGORIES: SplitCategory[] = ['Restaurant', 'Grocery', 'Entertainment', 'Utilities', 'Other'];
+const CATEGORIES: SplitCategory[] = ['Food', 'Grocery', 'Entertainment', 'Utilities', 'Other'];
 
 interface ReceiptScreenProps {
   split: Split;

@@ -71,13 +71,13 @@ describe('spendingAggregation - excludeMe', () => {
   describe('getCategoryTotals', () => {
     it('should use user shares, not total receipt amounts', () => {
       const splits: Split[] = [
-        { ...createSplit(false, 10000, 2), category: 'Restaurant' }, // $50 user share
-        { ...createSplit(true, 20000, 3), category: 'Restaurant' },   // $0 user share (excluded)
+        { ...createSplit(false, 10000, 2), category: 'Food' }, // $50 user share
+        { ...createSplit(true, 20000, 3), category: 'Food' },   // $0 user share (excluded)
         { ...createSplit(false, 30000, 3), category: 'Grocery' },    // $100 user share
       ];
       const totals = getCategoryTotals(splits);
       
-      const restaurant = totals.find(t => t.category === 'Restaurant');
+      const restaurant = totals.find(t => t.category === 'Food');
       const grocery = totals.find(t => t.category === 'Grocery');
       
       expect(restaurant?.cents).toBe(5000); // Only the included split counts

@@ -207,7 +207,7 @@ export const ReceiptScreen: React.FC<ReceiptScreenProps> = ({
             Category {!hasCategory && <span className="text-red-400">*</span>}
           </h3>
           <div className="flex flex-wrap gap-2">
-            {(['Restaurant', 'Grocery', 'Entertainment', 'Utilities', 'Other'] as SplitCategory[]).map(category => (
+            {(['Food', 'Grocery', 'Entertainment', 'Utilities', 'Other'] as SplitCategory[]).map(category => (
               <button
                 key={category}
                 type="button"

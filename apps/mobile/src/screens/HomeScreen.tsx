@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { getReceiptTotal, formatCurrency } from '@receiptsplit/shared';
-import type { Split, SplitEvent } from '@receiptsplit/shared';
+import type { Split, SplitEvent, SplitCategory } from '@receiptsplit/shared';
 import { useSplits } from '../contexts/SplitsContext';
 import { useToast } from '../contexts/ToastContext';
 import { SwipeableRow } from '../components/SwipeableRow';
@@ -14,6 +14,19 @@ import type { HomeStackParamList } from '../navigation/HomeStack';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Food: '#f97316',
+  Grocery: '#22c55e',
+  Entertainment: '#a855f7',
+  Utilities: '#3b82f6',
+  Other: '#64748b',
+};
+
+function getCategoryColor(category?: string): string {
+  if (!category) return 'transparent';
+  return CATEGORY_COLORS[category] ?? 'transparent';
+}
 
 function formatDate(ts: number): string {
   const d = new Date(ts);
@@ -31,6 +44,7 @@ export default function HomeScreen() {
   const { showToast } = useToast();
   const navigation = useNavigation<Nav>();
   const [events, setEvents] = useState<SplitEvent[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const multiSplit = useMultiSplitSafe();
 
   // Load events on focus (authenticated only)
@@ -79,6 +93,31 @@ export default function HomeScreen() {
 
     return items.sort((a, b) => b.sortKey - a.sortKey);
   }, [activeSplits, events, eventSplitIds]);
+
+  // Collect categories that exist in the list for filter chips
+  const availableCategories = useMemo(() => {
+    const cats = new Set<string>();
+    for (const split of activeSplits) {
+      if (split.category) cats.add(split.category);
+    }
+    return Array.from(cats).sort();
+  }, [activeSplits]);
+
+  // Apply category filter
+  const filteredListItems = useMemo(() => {
+    if (!categoryFilter) return listItems;
+    return listItems.filter((item) => {
+      if (item.type === 'split') return item.data.category === categoryFilter;
+      if (item.type === 'event') {
+        // Show event if any of its receipts match the filter
+        const eventSplitsList = item.data.splitIds
+          .map((id) => activeSplits.find((s) => s.id === id))
+          .filter((s): s is Split => !!s);
+        return eventSplitsList.some((s) => s.category === categoryFilter);
+      }
+      return true;
+    });
+  }, [listItems, categoryFilter, activeSplits]);
 
   const onNewSplit = () => {
     if (isGuest) {
@@ -150,19 +189,41 @@ export default function HomeScreen() {
           <Text style={styles.newSplitText}>New Split</Text>
         </Pressable>
 
-        <Text style={styles.sectionTitle}>Recent Splits</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent Splits</Text>
+          {availableCategories.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterRowContent}>
+              <Pressable
+                onPress={() => setCategoryFilter(null)}
+                style={[styles.filterChip, !categoryFilter && styles.filterChipActive]}
+              >
+                <Text style={[styles.filterChipText, !categoryFilter && styles.filterChipTextActive]}>All</Text>
+              </Pressable>
+              {availableCategories.map((cat) => (
+                <Pressable
+                  key={cat}
+                  onPress={() => setCategoryFilter((prev) => prev === cat ? null : cat)}
+                  style={[styles.filterChip, categoryFilter === cat && { backgroundColor: getCategoryColor(cat), borderColor: getCategoryColor(cat) }]}
+                >
+                  <View style={[styles.filterDot, { backgroundColor: getCategoryColor(cat) }, categoryFilter === cat && { backgroundColor: '#fff' }]} />
+                  <Text style={[styles.filterChipText, categoryFilter === cat && { color: '#fff', fontWeight: '600' }]}>{cat}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+        </View>
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="rgba(255,255,255,0.6)" />
           </View>
-        ) : listItems.length === 0 ? (
+        ) : filteredListItems.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>No splits yet</Text>
-            <Text style={styles.muted}>Create your first split to start dividing bills with friends</Text>
+            <Text style={styles.emptyTitle}>{categoryFilter ? `No ${categoryFilter} splits` : 'No splits yet'}</Text>
+            <Text style={styles.muted}>{categoryFilter ? 'Try a different category or clear the filter' : 'Create your first split to start dividing bills with friends'}</Text>
           </View>
         ) : (
           <FlatList
-            data={listItems}
+            data={filteredListItems}
             keyExtractor={(item) => item.type === 'split' ? item.data.id : `event-${item.data.id}`}
             renderItem={({ item }) => {
               if (item.type === 'event') {
@@ -195,6 +256,7 @@ export default function HomeScreen() {
               }
 
               const split = item.data;
+              const catColor = getCategoryColor(split.category);
               return (
                 <SwipeableRow onDelete={() => {
                   deleteSplit(split.id);
@@ -206,7 +268,11 @@ export default function HomeScreen() {
                   });
                 }}>
                   <Pressable
-                    style={({ pressed }) => [styles.card, pressed && { opacity: 0.8 }]}
+                    style={({ pressed }) => [
+                      styles.card,
+                      catColor !== 'transparent' && { borderLeftWidth: 3, borderLeftColor: catColor },
+                      pressed && { opacity: 0.8 },
+                    ]}
                     onPress={() => onSplitPress(split)}
                     hitSlop={hitSlop}
                     accessibilityRole="button"
@@ -249,7 +315,28 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   newSplitText: { color: '#000', fontSize: 16, fontWeight: '600' },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#fff', marginBottom: 12 },
+  sectionHeader: { marginBottom: 12 },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#fff' },
+  filterRow: { marginTop: 10 },
+  filterRowContent: { gap: 8 },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  filterChipActive: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  filterChipText: { color: 'rgba(255,255,255,0.7)', fontSize: 13 },
+  filterChipTextActive: { color: '#fff', fontWeight: '600' },
+  filterDot: { width: 8, height: 8, borderRadius: 4 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 },
   list: { flex: 1 },
   card: {

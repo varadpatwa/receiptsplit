@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Modal, Switch, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, Switch, ScrollView, ActivityIndicator, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { getSplitsInRange, getPeriodStart, getPeriodEnd, getPeriodLabel, getUserSpendingCents, getCategoryTotals, formatCurrency } from '@receiptsplit/shared';
-import type { SpendingPeriod, CategoryTotal } from '@receiptsplit/shared';
+import { getSplitsInRange, getPeriodStart, getPeriodEnd, getPeriodLabel, getUserSpendingCents, getUserShareCents, getCategoryTotals, formatCurrency } from '@receiptsplit/shared';
+import type { Split, SpendingPeriod, CategoryTotal } from '@receiptsplit/shared';
 import { useSplits } from '../contexts/SplitsContext';
 import { getConfirmedFriendSharesForRange, getConfirmedSharesForRange } from '../lib/splitFriendRequests';
 import { DonutChart, type DonutSegment } from '../components/DonutChart';
@@ -17,7 +17,7 @@ const PERIOD_MENU_LABELS: Record<SpendingPeriod, string> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Restaurant: '#f97316',
+  Food: '#f97316',
   Grocery: '#22c55e',
   Entertainment: '#a855f7',
   Utilities: '#3b82f6',
@@ -50,11 +50,20 @@ function mergeCategoryTotals(
     .sort((a, b) => b.cents - a.cents);
 }
 
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
+
+function formatDate(ts: number): string {
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
 export default function SpendingScreen() {
   const { splits, loading } = useSplits();
   const [period, setPeriod] = useState<SpendingPeriod>('weekly');
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [confirmedRaw, setConfirmedRaw] = useState<{ totalCents: number }>({ totalCents: 0 });
   const [confirmedShares, setConfirmedShares] = useState<{ totalCents: number; categoryCents: Array<{ category: string; cents: number }> }>({
     totalCents: 0,
@@ -115,6 +124,23 @@ export default function SpendingScreen() {
     ? mergeCategoryTotals(ownCategoryTotals, confirmedShares.categoryCents, totalCents)
     : ownCategoryTotals.map((c) => ({ ...c, percent: ownerCentsTotal > 0 ? (c.cents / ownerCentsTotal) * 100 : 0 }));
   const hasData = totalCents > 0;
+
+  // Group splits by category for detail view
+  const splitsByCategory = useMemo(() => {
+    const map = new Map<string, Split[]>();
+    for (const split of periodSplits) {
+      const cat = split.category ?? 'Uncategorized';
+      const arr = map.get(cat) ?? [];
+      arr.push(split);
+      map.set(cat, arr);
+    }
+    return map;
+  }, [periodSplits]);
+
+  const toggleCategory = (category: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedCategory((prev) => (prev === category ? null : category));
+  };
 
   const donutSegments: DonutSegment[] = mergedCategoryTotals
     .filter((c) => c.cents > 0)
@@ -206,18 +232,54 @@ export default function SpendingScreen() {
                 <Text style={styles.sectionTitle}>By category</Text>
                 {mergedCategoryTotals
                   .filter((c: CategoryTotal) => c.cents > 0)
-                  .map((c: CategoryTotal) => (
-                    <View key={c.category} style={styles.categoryRow}>
-                      <View style={styles.categoryLeft}>
-                        <View style={[styles.categoryDot, { backgroundColor: getCategoryColor(c.category) }]} />
-                        <Text style={styles.categoryName}>{c.category}</Text>
+                  .map((c: CategoryTotal) => {
+                    const isExpanded = expandedCategory === c.category;
+                    const categorySplits = splitsByCategory.get(c.category) ?? [];
+                    return (
+                      <View key={c.category}>
+                        <Pressable
+                          onPress={() => toggleCategory(c.category)}
+                          style={[styles.categoryRow, isExpanded && styles.categoryRowExpanded]}
+                        >
+                          <View style={styles.categoryLeft}>
+                            <View style={[styles.categoryDot, { backgroundColor: getCategoryColor(c.category) }]} />
+                            <Text style={styles.categoryName}>{c.category}</Text>
+                          </View>
+                          <View style={styles.categoryRight}>
+                            <Text style={styles.categoryCents}>{formatCurrency(c.cents)}</Text>
+                            <Text style={styles.categoryPercent}>{c.percent.toFixed(0)}%</Text>
+                            <Ionicons
+                              name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                              size={16}
+                              color="rgba(255,255,255,0.4)"
+                            />
+                          </View>
+                        </Pressable>
+                        {isExpanded && categorySplits.length > 0 && (
+                          <View style={styles.categoryDetail}>
+                            {categorySplits
+                              .sort((a, b) => b.updatedAt - a.updatedAt)
+                              .map((split) => {
+                                const myShare = getUserShareCents(split);
+                                return (
+                                  <View key={split.id} style={styles.detailRow}>
+                                    <View style={styles.detailLeft}>
+                                      <Text style={styles.detailName} numberOfLines={1}>
+                                        {split.name || 'Untitled'}
+                                      </Text>
+                                      <Text style={styles.detailMeta}>
+                                        {formatDate(split.updatedAt)} · {split.participants.length} people
+                                      </Text>
+                                    </View>
+                                    <Text style={styles.detailAmount}>{formatCurrency(myShare)}</Text>
+                                  </View>
+                                );
+                              })}
+                          </View>
+                        )}
                       </View>
-                      <View style={styles.categoryRight}>
-                        <Text style={styles.categoryCents}>{formatCurrency(c.cents)}</Text>
-                        <Text style={styles.categoryPercent}>{c.percent.toFixed(0)}%</Text>
-                      </View>
-                    </View>
-                  ))}
+                    );
+                  })}
               </View>
             ) : (
               <View style={styles.emptyState}>
@@ -337,7 +399,35 @@ const styles = StyleSheet.create({
   categoryName: { color: '#fff', fontSize: 16 },
   categoryRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   categoryCents: { color: '#fff', fontSize: 16, fontWeight: '500' },
-  categoryPercent: { color: 'rgba(255,255,255,0.6)', fontSize: 14 },
+  categoryPercent: { color: 'rgba(255,255,255,0.6)', fontSize: 14, minWidth: 32, textAlign: 'right' },
+  categoryRowExpanded: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    marginBottom: 0,
+  },
+  categoryDetail: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  detailLeft: { flex: 1, marginRight: 12 },
+  detailName: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '500' },
+  detailMeta: { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 },
+  detailAmount: { color: '#fff', fontSize: 14, fontWeight: '600' },
   emptyState: { paddingVertical: 32, alignItems: 'center' },
   emptyText: { color: 'rgba(255,255,255,0.6)', fontSize: 16 },
   emptySubtext: { color: 'rgba(255,255,255,0.4)', fontSize: 14, marginTop: 8 },

@@ -11,7 +11,7 @@ import {
 } from '@/utils/spendingAggregation';
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Restaurant: '#f97316',
+  Food: '#f97316',
   Grocery: '#22c55e',
   Entertainment: '#a855f7',
   Utilities: '#3b82f6',
