@@ -213,7 +213,7 @@ export function PeopleScreen({ split, onUpdate, onNext, onBack }: PeopleScreenPr
               style={[styles.addBtn, !newName.trim() && styles.addBtnDisabled]}
               disabled={!newName.trim()}
             >
-              <Ionicons name="add" size={24} color="#fff" />
+              <Ionicons name="checkmark" size={24} color="#000" />
             </Pressable>
           </View>
           {suggestions.length > 0 ? (

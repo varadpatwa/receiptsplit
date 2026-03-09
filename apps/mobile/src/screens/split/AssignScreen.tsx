@@ -21,9 +21,10 @@ interface AssignScreenProps {
   onUpdate: (split: Split) => void;
   onNext: () => void;
   onBack: () => void;
+  subtitle?: string;
 }
 
-export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenProps) {
+export function AssignScreen({ split, onUpdate, onNext, onBack, subtitle }: AssignScreenProps) {
   const { userId } = useAuth();
   const [suggestions, setSuggestions] = useState<Map<string, AssignmentSuggestion>>(new Map());
 
@@ -116,7 +117,11 @@ export function AssignScreen({ split, onUpdate, onNext, onBack }: AssignScreenPr
           </Pressable>
           <Text style={styles.title}>Assign Items</Text>
         </View>
-        <Stepper currentStep="assign" />
+        {subtitle ? (
+          <Text style={styles.subtitle}>{subtitle}</Text>
+        ) : (
+          <Stepper currentStep="assign" />
+        )}
 
         {hasAnySuggestion && (
           <View style={styles.suggestionBanner}>
@@ -245,6 +250,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   backBtn: { padding: 8, marginRight: 8 },
   title: { fontSize: 22, fontWeight: '600', color: '#fff' },
+  subtitle: { fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 16, marginLeft: 36 },
   card: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,

@@ -38,6 +38,15 @@ export interface Split {
   receiptImagePath?: string;
 }
 
+export interface SplitEvent {
+  id: string;
+  title: string;
+  startDate?: string; // ISO date string (YYYY-MM-DD)
+  endDate?: string;
+  createdAt: number; // ms timestamp
+  splitIds: string[];
+}
+
 export interface ParticipantBreakdown {
   participantId: string;
   participantName: string;

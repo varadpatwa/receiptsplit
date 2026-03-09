@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { getReceiptTotal, formatCurrency } from '@receiptsplit/shared';
+import type { Split, SplitEvent } from '@receiptsplit/shared';
 import { useSplits } from '../contexts/SplitsContext';
 import { useToast } from '../contexts/ToastContext';
 import { SwipeableRow } from '../components/SwipeableRow';
-import type { Split } from '@receiptsplit/shared';
+import { listEvents, deleteEvent } from '../lib/events';
+import { useMultiSplitSafe } from '../contexts/MultiSplitContext';
 import type { HomeStackParamList } from '../navigation/HomeStack';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -20,16 +22,75 @@ function formatDate(ts: number): string {
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'HomeList'>;
 
+type ListItem =
+  | { type: 'split'; data: Split; sortKey: number }
+  | { type: 'event'; data: SplitEvent; sortKey: number; total: number; receiptCount: number };
+
 export default function HomeScreen() {
   const { activeSplits, loading, createNewSplit, loadSplit, saveSplit, deleteSplit, restoreSplit, saveError, clearSaveError, isGuest } = useSplits();
   const { showToast } = useToast();
   const navigation = useNavigation<Nav>();
+  const [events, setEvents] = useState<SplitEvent[]>([]);
+  const multiSplit = useMultiSplitSafe();
+
+  // Load events on focus (authenticated only)
+  useFocusEffect(
+    useCallback(() => {
+      if (isGuest) return;
+      listEvents().then(setEvents).catch(() => {});
+    }, [isGuest])
+  );
+
+  // Collect split IDs that belong to events (to avoid double-showing)
+  const eventSplitIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const event of events) {
+      for (const sid of event.splitIds) ids.add(sid);
+    }
+    return ids;
+  }, [events]);
+
+  // Build merged list
+  const listItems = useMemo((): ListItem[] => {
+    const items: ListItem[] = [];
+
+    // Add standalone splits (not part of any event)
+    for (const split of activeSplits) {
+      if (!eventSplitIds.has(split.id)) {
+        items.push({ type: 'split', data: split, sortKey: split.updatedAt });
+      }
+    }
+
+    // Add events
+    for (const event of events) {
+      const eventSplits = event.splitIds
+        .map((id) => activeSplits.find((s) => s.id === id))
+        .filter((s): s is Split => !!s);
+      const total = eventSplits.reduce((sum, s) => sum + getReceiptTotal(s), 0);
+      const mostRecent = eventSplits.reduce((max, s) => Math.max(max, s.updatedAt), event.createdAt);
+      items.push({
+        type: 'event',
+        data: event,
+        sortKey: mostRecent,
+        total,
+        receiptCount: eventSplits.length,
+      });
+    }
+
+    return items.sort((a, b) => b.sortKey - a.sortKey);
+  }, [activeSplits, events, eventSplitIds]);
 
   const onNewSplit = () => {
-    const newSplit = createNewSplit();
-    saveSplit(newSplit, true)
-      .then(() => navigation.navigate('Receipt'))
-      .catch(() => {});
+    if (isGuest) {
+      // Guest mode: use old manual entry flow
+      const newSplit = createNewSplit();
+      saveSplit(newSplit, true)
+        .then(() => navigation.navigate('Receipt'))
+        .catch(() => {});
+    } else {
+      // Authenticated: use capture flow (works for 1 or many receipts)
+      navigation.navigate('MultiSplitCapture');
+    }
   };
 
   const onSplitPress = (split: Split) => {
@@ -39,7 +100,10 @@ export default function HomeScreen() {
     navigation.navigate(screenName);
   };
 
-  const sorted = [...activeSplits].sort((a, b) => b.updatedAt - a.updatedAt);
+  const onEventPress = (event: SplitEvent) => {
+    multiSplit?.loadMultiSplit(event);
+    navigation.navigate('MultiSplitHub');
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -76,60 +140,94 @@ export default function HomeScreen() {
           ) : null}
         </View>
         <Text style={styles.subtitle}>Split bills in under 60 seconds</Text>
+
+        {/* Action Button */}
         <Pressable
-        style={({ pressed }) => [styles.newSplitButton, pressed && { opacity: 0.8 }]}
-        onPress={onNewSplit}
-        hitSlop={hitSlop}
-        accessibilityRole="button"
-        accessibilityLabel="New split"
-      >
-        <Text style={styles.newSplitText}>New Split</Text>
-      </Pressable>
-      <Text style={styles.sectionTitle}>Recent Splits</Text>
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="rgba(255,255,255,0.6)" />
-        </View>
-      ) : sorted.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>No splits yet</Text>
-          <Text style={styles.muted}>Create your first split to start dividing bills with friends</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={sorted}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <SwipeableRow onDelete={() => {
-              deleteSplit(item.id);
-              showToast({
-                message: `"${item.name}" deleted`,
-                variant: 'info',
-                duration: 6000,
-                action: { label: 'Undo', onPress: () => restoreSplit(item.id) },
-              });
-            }}>
-              <Pressable
-                style={({ pressed }) => [styles.card, pressed && { opacity: 0.8 }]}
-                onPress={() => onSplitPress(item)}
-                hitSlop={hitSlop}
-                accessibilityRole="button"
-                accessibilityLabel={`Open split ${item.name}`}
-              >
-                <View style={styles.cardRow}>
-                  <View style={styles.cardLeft}>
-                    <Text style={styles.cardName}>{item.name}</Text>
-                    <Text style={styles.muted}>
-                      {item.merchantName ? `${item.merchantName} · ` : ''}{formatDate(item.updatedAt)} · {formatCurrency(getReceiptTotal(item) || 0)} · {item.participants.length} people
-                    </Text>
-                  </View>
-                </View>
-              </Pressable>
-            </SwipeableRow>
-          )}
-          style={styles.list}
-        />
-      )}
+          style={({ pressed }) => [styles.newSplitButton, pressed && { opacity: 0.8 }]}
+          onPress={onNewSplit}
+          hitSlop={hitSlop}
+        >
+          <Text style={styles.newSplitText}>New Split</Text>
+        </Pressable>
+
+        <Text style={styles.sectionTitle}>Recent Splits</Text>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="rgba(255,255,255,0.6)" />
+          </View>
+        ) : listItems.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>No splits yet</Text>
+            <Text style={styles.muted}>Create your first split to start dividing bills with friends</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={listItems}
+            keyExtractor={(item) => item.type === 'split' ? item.data.id : `event-${item.data.id}`}
+            renderItem={({ item }) => {
+              if (item.type === 'event') {
+                const evt = item.data;
+                return (
+                  <SwipeableRow onDelete={() => {
+                    deleteEvent(evt.id).catch(() => {});
+                    setEvents((prev) => prev.filter((e) => e.id !== evt.id));
+                    showToast({ message: `"${evt.title}" deleted`, variant: 'info', duration: 4000 });
+                  }}>
+                    <Pressable
+                      style={({ pressed }) => [styles.card, styles.eventCard, pressed && { opacity: 0.8 }]}
+                      onPress={() => onEventPress(evt)}
+                    >
+                      <View style={styles.cardRow}>
+                        <View style={styles.eventIcon}>
+                          <Ionicons name="layers" size={20} color="rgba(96,165,250,0.9)" />
+                        </View>
+                        <View style={styles.cardLeft}>
+                          <Text style={styles.cardName}>{evt.title}</Text>
+                          <Text style={styles.muted}>
+                            {item.receiptCount} receipt{item.receiptCount !== 1 ? 's' : ''} · {formatCurrency(item.total)}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
+                      </View>
+                    </Pressable>
+                  </SwipeableRow>
+                );
+              }
+
+              const split = item.data;
+              return (
+                <SwipeableRow onDelete={() => {
+                  deleteSplit(split.id);
+                  showToast({
+                    message: `"${split.name}" deleted`,
+                    variant: 'info',
+                    duration: 6000,
+                    action: { label: 'Undo', onPress: () => restoreSplit(split.id) },
+                  });
+                }}>
+                  <Pressable
+                    style={({ pressed }) => [styles.card, pressed && { opacity: 0.8 }]}
+                    onPress={() => onSplitPress(split)}
+                    hitSlop={hitSlop}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open split ${split.name}`}
+                  >
+                    <View style={styles.cardRow}>
+                      <View style={styles.cardLeft}>
+                        <Text style={styles.cardName}>{split.name}</Text>
+                        <Text style={styles.muted}>
+                          {split.merchantName ? `${split.merchantName} · ` : ''}{formatDate(split.updatedAt)} · {formatCurrency(getReceiptTotal(split) || 0)} · {split.participants.length} people
+                        </Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                </SwipeableRow>
+              );
+            }}
+            style={styles.list}
+            contentContainerStyle={{ gap: 8 }}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -142,19 +240,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '600', color: '#fff' },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconButton: { padding: 4 },
-  badge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#ef4444',
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   subtitle: { color: 'rgba(255,255,255,0.6)', marginBottom: 24 },
   newSplitButton: {
     backgroundColor: '#fff',
@@ -174,7 +259,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.1)',
     padding: 16,
   },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  eventCard: {
+    borderColor: 'rgba(96,165,250,0.2)',
+  },
+  eventIcon: { marginRight: 12 },
+  cardRow: { flexDirection: 'row', alignItems: 'center' },
   cardLeft: { flex: 1 },
   cardName: { fontSize: 16, fontWeight: '600', color: '#fff', marginBottom: 4 },
   muted: { color: 'rgba(255,255,255,0.6)', fontSize: 14 },

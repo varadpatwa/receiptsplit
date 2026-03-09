@@ -128,8 +128,8 @@ export async function createSplit(split: Split): Promise<Split> {
   }
   const normalized = normalizeSplit(split);
   const row = splitToRow(normalized);
-  // Omit id so Postgres generates it (table must have DEFAULT gen_random_uuid() or uuid_generate_v4() on id).
   const payloadWithSplitData = {
+    id: row.id,
     user_id: user.id,
     title: row.title,
     total: row.total,
@@ -140,6 +140,7 @@ export async function createSplit(split: Split): Promise<Split> {
     split_data: row.split_data,
   };
   const payloadRequiredOnly = {
+    id: row.id,
     user_id: user.id,
     title: row.title,
     total: row.total,
@@ -154,7 +155,6 @@ export async function createSplit(split: Split): Promise<Split> {
   if (result.error) throw new Error(`Failed to create split: ${result.error.message}`);
   const saved = rowToSplit(result.data);
   try {
-    // Use saved id: createSplit omits id so Postgres generates it; normalized.id is client-only.
     await upsertFriendRequestsForSplit({ ...normalized, id: saved.id });
   } catch (e) {
     if (__DEV__) {

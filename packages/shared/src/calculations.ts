@@ -153,3 +153,40 @@ export function getRunningTally(split: Split): Map<string, number> {
 export function allItemsAssigned(split: Split): boolean {
   return split.items.every((item) => item.assignments.length > 0);
 }
+
+/**
+ * Calculate per-person totals across multiple splits in an event.
+ * Returns a map of participant name (lowercased) → { name, total }.
+ * Matches participants across splits by name (case-insensitive).
+ */
+export function calculateEventBreakdown(
+  splits: Split[]
+): { name: string; total: number }[] {
+  const totals = new Map<string, { name: string; total: number }>();
+
+  for (const split of splits) {
+    const breakdowns = calculateBreakdown(split);
+    for (const b of breakdowns) {
+      const key = b.participantName.toLowerCase();
+      const existing = totals.get(key);
+      if (existing) {
+        existing.total += b.grandTotal;
+      } else {
+        totals.set(key, { name: b.participantName, total: b.grandTotal });
+      }
+    }
+  }
+
+  return Array.from(totals.values()).sort((a, b) => b.total - a.total);
+}
+
+/**
+ * Calculate what each person owes based on what they actually got assigned.
+ * Returns a list with each person's name and their total across all receipts.
+ * This is "you pay what you ordered", not an equal split.
+ */
+export function calculateEventSettlement(
+  splits: Split[]
+): { name: string; owes: number }[] {
+  return calculateEventBreakdown(splits).filter((b) => b.total > 0);
+}
