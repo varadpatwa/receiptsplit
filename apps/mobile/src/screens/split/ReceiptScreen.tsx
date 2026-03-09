@@ -25,7 +25,7 @@ import {
 } from '@receiptsplit/shared';
 import { Stepper } from '../../components/Stepper';
 import { useAuth } from '../../contexts/AuthContext';
-import { uploadAndParseReceipt } from '../../lib/parseReceipt';
+import { uploadAndParseReceipt, type TotalsMismatchWarning } from '../../lib/parseReceipt';
 
 const CATEGORIES: SplitCategory[] = ['Restaurant', 'Grocery', 'Entertainment', 'Utilities', 'Other'];
 
@@ -46,6 +46,8 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
   const [tipInput, setTipInput] = useState('');
   const [parseLoading, setParseLoading] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [totalsMismatch, setTotalsMismatch] = useState<TotalsMismatchWarning | null>(null);
+  const [lastImageUri, setLastImageUri] = useState<string | null>(null);
 
   useEffect(() => {
     const newPriceInputs: Record<string, string> = {};
@@ -69,28 +71,14 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
     onUpdate({ ...split, items: [...split.items, newItem] });
   };
 
-  const handleUploadReceipt = async () => {
-    if (!userId) {
-      Alert.alert('Sign in required', 'Please sign in to scan a receipt.');
-      return;
-    }
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow access to your photos to upload a receipt.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-    if (result.canceled || !result.assets?.[0]?.uri) return;
-
+  const parseImageUri = async (imageUri: string) => {
+    if (!userId) return;
     setParseLoading(true);
     setParseError(null);
+    setTotalsMismatch(null);
+    setLastImageUri(imageUri);
     try {
-      const parsed = await uploadAndParseReceipt(result.assets[0].uri, userId);
+      const parsed = await uploadAndParseReceipt(imageUri, userId);
       const newItems: Item[] = parsed.items.map((it) => ({
         id: generateId(),
         name: it.label,
@@ -112,11 +100,40 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
       setPriceInputs(nextPriceInputs);
       setTaxInput(centsToMoneyString(parsed.tax));
       setTipInput(centsToMoneyString(parsed.tip));
+      if (parsed.totalsMismatch) {
+        setTotalsMismatch(parsed.totalsMismatch);
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to parse receipt';
       setParseError(message);
     } finally {
       setParseLoading(false);
+    }
+  };
+
+  const handleUploadReceipt = async () => {
+    if (!userId) {
+      Alert.alert('Sign in required', 'Please sign in to scan a receipt.');
+      return;
+    }
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow access to your photos to upload a receipt.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    await parseImageUri(result.assets[0].uri);
+  };
+
+  const handleRetry = () => {
+    if (lastImageUri && userId) {
+      parseImageUri(lastImageUri);
     }
   };
 
@@ -283,10 +300,33 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
             </View>
           </View>
           {parseError ? (
-            <Pressable style={styles.parseErrorBanner} onPress={() => setParseError(null)}>
+            <View style={styles.parseErrorBanner}>
               <Text style={styles.parseErrorText}>{parseError}</Text>
-              <Text style={styles.parseErrorDismiss}>Dismiss</Text>
-            </Pressable>
+              <View style={styles.parseErrorActions}>
+                {lastImageUri && (
+                  <Pressable onPress={handleRetry} style={styles.retryBtn}>
+                    <Text style={styles.retryBtnText}>Retry</Text>
+                  </Pressable>
+                )}
+                <Pressable onPress={() => setParseError(null)}>
+                  <Text style={styles.parseErrorDismiss}>Dismiss</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+          {totalsMismatch ? (
+            <View style={styles.mismatchBanner}>
+              <Ionicons name="warning" size={18} color="rgba(255,200,0,0.9)" />
+              <View style={styles.mismatchText}>
+                <Text style={styles.mismatchTitle}>Totals may not match</Text>
+                <Text style={styles.mismatchSub}>
+                  Item sum ({formatCurrency(totalsMismatch.itemSum)}) differs from receipt subtotal ({formatCurrency(totalsMismatch.reportedSubtotal)}) by ~{totalsMismatch.differencePercent}%. Please review.
+                </Text>
+              </View>
+              <Pressable onPress={() => setTotalsMismatch(null)} hitSlop={8}>
+                <Ionicons name="close" size={18} color="rgba(255,255,255,0.5)" />
+              </Pressable>
+            </View>
           ) : null}
           {split.items.length === 0 ? (
             <View style={styles.emptyItems}>
@@ -453,9 +493,6 @@ const styles = StyleSheet.create({
   scanBtnDisabled: { opacity: 0.7 },
   scanBtnText: { fontSize: 14, fontWeight: '600', color: '#0B0B0C' },
   parseErrorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: 'rgba(239,68,68,0.15)',
     borderWidth: 1,
     borderColor: 'rgba(239,68,68,0.3)',
@@ -463,8 +500,30 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
   },
-  parseErrorText: { flex: 1, color: '#fca5a5', fontSize: 14 },
-  parseErrorDismiss: { color: '#fca5a5', fontSize: 14, fontWeight: '600', marginLeft: 8 },
+  parseErrorText: { flex: 1, color: '#fca5a5', fontSize: 14, marginBottom: 8 },
+  parseErrorActions: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  retryBtn: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  retryBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  parseErrorDismiss: { color: '#fca5a5', fontSize: 13, fontWeight: '600' },
+  mismatchBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: 'rgba(255,200,0,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,200,0,0.2)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  mismatchText: { flex: 1 },
+  mismatchTitle: { fontWeight: '600', color: 'rgba(255,200,0,0.9)', fontSize: 14 },
+  mismatchSub: { fontSize: 13, color: 'rgba(255,200,0,0.7)', marginTop: 4 },
   flex1: { flex: 1 },
   muted: { fontSize: 14, color: 'rgba(255,255,255,0.6)' },
   mutedSmall: { fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 },
