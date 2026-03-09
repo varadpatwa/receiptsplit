@@ -1,4 +1,5 @@
 import type { Split, Participant } from '@receiptsplit/shared';
+import { generateAutoTitle } from '@receiptsplit/shared';
 import { supabase } from './supabase';
 import { upsertFriendRequestsForSplit } from './splitFriendRequests';
 
@@ -37,9 +38,10 @@ function splitToRow(split: Split): {
   title: string;
   total: number;
   exclude_me: boolean;
+  receipt_image_path: string | null;
   participants: Participant[];
   created_at: string;
-  split_data: Omit<Split, 'id' | 'name' | 'createdAt' | 'updatedAt' | 'participants' | 'excludeMe'>;
+  split_data: Record<string, unknown>;
 } {
   const normalized = normalizeSplit(split);
   const total = Math.round(Number(calculateTotal(normalized)) || 0);
@@ -52,6 +54,7 @@ function splitToRow(split: Split): {
     title,
     total,
     exclude_me: Boolean(normalized.excludeMe),
+    receipt_image_path: normalized.receiptImagePath ?? null,
     participants,
     created_at,
     split_data: {
@@ -59,7 +62,11 @@ function splitToRow(split: Split): {
       taxInCents: normalized.taxInCents ?? 0,
       tipInCents: normalized.tipInCents ?? 0,
       currentStep: normalized.currentStep ?? 'receipt',
+      updatedAt: normalized.updatedAt,
       category: normalized.category,
+      titleAuto: normalized.titleAuto,
+      titleUserOverride: normalized.titleUserOverride,
+      merchantName: normalized.merchantName,
     },
   };
 }
@@ -74,12 +81,18 @@ function rowToSplit(row: {
   title: string;
   exclude_me: boolean;
   is_deleted?: boolean;
+  receipt_image_path?: string;
   participants: Participant[];
   created_at: string;
   split_data: any;
 }): Split {
   const createdAt = new Date(row.created_at).getTime();
   const updatedAt = row.split_data?.updatedAt ?? createdAt;
+  const category = row.split_data?.category;
+  const merchantName = row.split_data?.merchantName;
+  // Backfill auto-title for existing splits that don't have one
+  const titleAuto = row.split_data?.titleAuto ?? generateAutoTitle({ merchantName, category, createdAt });
+  const titleUserOverride = row.split_data?.titleUserOverride ?? false;
   return normalizeSplit({
     id: row.id,
     name: row.title,
@@ -90,9 +103,13 @@ function rowToSplit(row: {
     taxInCents: row.split_data?.taxInCents ?? 0,
     tipInCents: row.split_data?.tipInCents ?? 0,
     currentStep: row.split_data?.currentStep ?? 'receipt',
-    category: row.split_data?.category,
+    category,
     excludeMe: row.exclude_me,
     isDeleted: row.is_deleted ?? false,
+    titleAuto,
+    titleUserOverride,
+    merchantName,
+    receiptImagePath: row.receipt_image_path ?? undefined,
   });
 }
 
@@ -117,6 +134,7 @@ export async function createSplit(split: Split): Promise<Split> {
     title: row.title,
     total: row.total,
     exclude_me: row.exclude_me,
+    receipt_image_path: row.receipt_image_path,
     participants: row.participants,
     created_at: row.created_at,
     split_data: row.split_data,
@@ -154,6 +172,7 @@ export async function updateSplit(split: Split): Promise<Split> {
     title: row.title,
     total: row.total,
     exclude_me: row.exclude_me,
+    receipt_image_path: row.receipt_image_path,
     participants: row.participants,
     split_data: row.split_data,
   };

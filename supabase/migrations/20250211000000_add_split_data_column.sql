@@ -1,0 +1,1 @@
+ALTER TABLE splits ADD COLUMN IF NOT EXISTS split_data JSONB;

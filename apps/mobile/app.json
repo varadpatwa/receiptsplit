@@ -19,6 +19,18 @@
         "backgroundColor": "#0B0B0C"
       },
       "package": "com.receiptsplit.app"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "db683cbd-daca-4c83-83d6-593c5246319c"
+      }
+    },
+    "owner": "varadpatwa",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/db683cbd-daca-4c83-83d6-593c5246319c"
     }
   }
 }

@@ -23,6 +23,7 @@ export function FriendRequestsProvider({ children }: { children: React.ReactNode
   const [pendingSplitCount, setPendingSplitCount] = useState(0);
 
   const refreshPendingCount = useCallback(async () => {
+    if (!userId) return;
     try {
       const [friendCount, splitCount] = await Promise.all([
         getIncomingPendingCount(),
@@ -34,7 +35,7 @@ export function FriendRequestsProvider({ children }: { children: React.ReactNode
       setPendingIncomingCount(0);
       setPendingSplitCount(0);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) {

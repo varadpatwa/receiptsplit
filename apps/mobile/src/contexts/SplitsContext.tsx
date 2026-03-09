@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Split } from '@receiptsplit/shared';
-import { generateUuid } from '@receiptsplit/shared';
+import { generateUuid, generateAutoTitle } from '@receiptsplit/shared';
 import { useAuth } from './AuthContext';
 import { listSplits, createSplit, updateSplit, softDeleteSplit, restoreSplit as restoreSplitApi } from '../lib/splits';
+
+const PENDING_GUEST_SPLIT_KEY = 'pendingGuestSplit';
 
 type SplitsContextValue = {
   /** All splits including soft-deleted (for spending calculations). */
@@ -12,6 +15,7 @@ type SplitsContextValue = {
   currentSplit: Split | null;
   loading: boolean;
   saveError: string | null;
+  isGuest: boolean;
   clearSaveError: () => void;
   refetch: () => Promise<void>;
   createNewSplit: () => Split;
@@ -21,17 +25,67 @@ type SplitsContextValue = {
   restoreSplit: (splitId: string) => Promise<void>;
   updateCurrentSplit: (updater: (split: Split) => Split, immediate?: boolean) => void;
   clearCurrentSplit: () => void;
+  markSplitForUpgrade: (splitId: string) => Promise<void>;
 };
 
 const SplitsContext = createContext<SplitsContextValue | null>(null);
 
 export function SplitsProvider({ children }: { children: React.ReactNode }) {
   const { userId, sessionLoaded } = useAuth();
-  const [splits, setSplits] = useState<Split[]>([]);
-  const [currentSplit, setCurrentSplit] = useState<Split | null>(null);
+  const isGuest = !userId;
+  const [splits, setSplitsState] = useState<Split[]>([]);
+  const [guestSplits, setGuestSplits] = useState<Split[]>([]);
+  const [currentSplit, setCurrentSplitState] = useState<Split | null>(null);
   const [loading, setLoading] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Refs that stay in sync — updated both during render AND imperatively
+  const currentSplitRef = useRef<Split | null>(null);
+  const splitsRef = useRef<Split[]>([]);
+
+  // Keep refs in sync during render
+  currentSplitRef.current = currentSplit;
+  splitsRef.current = splits;
+
+  // Wrappers that update both state AND ref synchronously
+  const setCurrentSplit = useCallback((s: Split | null) => {
+    currentSplitRef.current = s;
+    setCurrentSplitState(s);
+  }, []);
+
+  const setSplits = useCallback((updater: Split[] | ((prev: Split[]) => Split[])) => {
+    if (typeof updater === 'function') {
+      setSplitsState((prev) => {
+        const next = updater(prev);
+        splitsRef.current = next;
+        return next;
+      });
+    } else {
+      splitsRef.current = updater;
+      setSplitsState(updater);
+    }
+  }, []);
+
+  // Upgrade pending guest split when user logs in
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(PENDING_GUEST_SPLIT_KEY);
+        if (!raw) return;
+        await AsyncStorage.removeItem(PENDING_GUEST_SPLIT_KEY);
+        const guestSplit: Split = JSON.parse(raw);
+        if (cancelled) return;
+        const saved = await createSplit(guestSplit);
+        setSplits((prev) => [saved, ...prev]);
+      } catch {
+        // non-fatal
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [userId, setSplits]);
 
   const refetch = useCallback(async () => {
     if (!userId) return;
@@ -44,7 +98,7 @@ export function SplitsProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, setSplits]);
 
   useEffect(() => {
     if (!sessionLoaded) return;
@@ -71,42 +125,58 @@ export function SplitsProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [sessionLoaded, userId]);
+  }, [sessionLoaded, userId, setSplits, setCurrentSplit]);
 
   const createNewSplit = useCallback((): Split => {
+    const now = Date.now();
+    const autoTitle = generateAutoTitle({ createdAt: now });
     const newSplit: Split = {
       id: generateUuid(),
-      name: `Split ${new Date().toLocaleDateString()}`,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      name: autoTitle,
+      createdAt: now,
+      updatedAt: now,
       items: [],
       participants: [{ id: 'me', name: 'Me' }],
       taxInCents: 0,
       tipInCents: 0,
       currentStep: 'receipt',
       excludeMe: false,
+      titleAuto: autoTitle,
+      titleUserOverride: false,
     };
     setCurrentSplit(newSplit);
     return newSplit;
-  }, []);
+  }, [setCurrentSplit]);
 
   const loadSplit = useCallback((splitId: string) => {
-    const split = splits.find((s) => s.id === splitId);
+    const allSplits = isGuest ? guestSplits : splitsRef.current;
+    const split = allSplits.find((s) => s.id === splitId);
     if (split) setCurrentSplit(split);
-  }, [splits]);
+  }, [guestSplits, isGuest, setCurrentSplit]);
 
   const saveSplit = useCallback(
     async (split: Split, immediate = false) => {
-      if (!userId) {
-        setSaveError('You must be signed in to save.');
-        return;
-      }
       setSaveError(null);
       setCurrentSplit(split);
+
+      // Guest mode: store in-memory only
+      if (isGuest) {
+        setGuestSplits((prev) => {
+          const idx = prev.findIndex((s) => s.id === split.id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = split;
+            return next;
+          }
+          return [split, ...prev];
+        });
+        return;
+      }
+
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
       const doSave = async (): Promise<void> => {
-        const isNew = !splits.some((s) => s.id === split.id);
+        const isNew = !splitsRef.current.some((s) => s.id === split.id);
         try {
           const saved = isNew ? await createSplit(split) : await updateSplit(split);
           setSplits((prev) => {
@@ -132,28 +202,33 @@ export function SplitsProvider({ children }: { children: React.ReactNode }) {
         saveTimeoutRef.current = setTimeout(() => doSave().catch(() => {}), 300);
       }
     },
-    [userId, splits]
+    [isGuest, setCurrentSplit, setSplits]
   );
 
   const deleteSplit = useCallback(
     async (splitId: string) => {
-      if (!userId) return;
+      if (isGuest) {
+        setGuestSplits((prev) => prev.filter((s) => s.id !== splitId));
+        if (currentSplitRef.current?.id === splitId) setCurrentSplit(null);
+        return;
+      }
       // Optimistic: mark as deleted locally
       setSplits((prev) =>
         prev.map((s) => (s.id === splitId ? { ...s, isDeleted: true } : s))
       );
-      if (currentSplit?.id === splitId) setCurrentSplit(null);
+      if (currentSplitRef.current?.id === splitId) setCurrentSplit(null);
       try {
         await softDeleteSplit(splitId);
       } catch {
         // Already marked locally; will sync on next refetch
       }
     },
-    [userId, currentSplit?.id]
+    [isGuest, setCurrentSplit, setSplits]
   );
 
   const restoreSplit = useCallback(
     async (splitId: string) => {
+      if (isGuest) return;
       // Optimistic: mark as not deleted locally
       setSplits((prev) =>
         prev.map((s) => (s.id === splitId ? { ...s, isDeleted: false } : s))
@@ -167,27 +242,39 @@ export function SplitsProvider({ children }: { children: React.ReactNode }) {
         );
       }
     },
-    []
+    [isGuest, setSplits]
   );
 
-  const activeSplits = splits.filter((s) => !s.isDeleted);
+  const markSplitForUpgrade = useCallback(async (splitId: string) => {
+    const latest = currentSplitRef.current;
+    const allSplits = [...guestSplits, ...(latest ? [latest] : [])];
+    const split = allSplits.find((s) => s.id === splitId);
+    if (split) {
+      await AsyncStorage.setItem(PENDING_GUEST_SPLIT_KEY, JSON.stringify(split));
+    }
+  }, [guestSplits]);
+
+  const effectiveSplits = isGuest ? guestSplits : splits;
+  const activeSplits = effectiveSplits.filter((s) => !s.isDeleted);
 
   const updateCurrentSplit = useCallback(
     (updater: (split: Split) => Split, immediate = false) => {
-      if (!currentSplit) return;
-      saveSplit(updater(currentSplit), immediate);
+      const latest = currentSplitRef.current;
+      if (!latest) return;
+      saveSplit(updater(latest), immediate);
     },
-    [currentSplit, saveSplit]
+    [saveSplit]
   );
 
-  const clearCurrentSplit = useCallback(() => setCurrentSplit(null), []);
+  const clearCurrentSplit = useCallback(() => setCurrentSplit(null), [setCurrentSplit]);
 
   const value: SplitsContextValue = {
-    splits,
+    splits: effectiveSplits,
     activeSplits,
     currentSplit,
     loading,
     saveError,
+    isGuest,
     clearSaveError: useCallback(() => setSaveError(null), []),
     refetch,
     createNewSplit,
@@ -197,6 +284,7 @@ export function SplitsProvider({ children }: { children: React.ReactNode }) {
     restoreSplit,
     updateCurrentSplit,
     clearCurrentSplit,
+    markSplitForUpgrade,
   };
 
   return <SplitsContext.Provider value={value}>{children}</SplitsContext.Provider>;

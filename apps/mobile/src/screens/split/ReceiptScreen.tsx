@@ -20,13 +20,14 @@ import type { Split, Item, SplitCategory } from '@receiptsplit/shared';
 import {
   formatCurrency,
   generateId,
+  generateAutoTitle,
   isValidMoneyInput,
   moneyStringToCents,
   centsToMoneyString,
 } from '@receiptsplit/shared';
 import { Stepper } from '../../components/Stepper';
 import { useAuth } from '../../contexts/AuthContext';
-import { uploadAndParseReceipt, type TotalsMismatchWarning } from '../../lib/parseReceipt';
+import { uploadReceiptImage, parseReceiptByPath, type TotalsMismatchWarning } from '../../lib/parseReceipt';
 
 const CATEGORIES: SplitCategory[] = ['Restaurant', 'Grocery', 'Entertainment', 'Utilities', 'Other'];
 
@@ -79,7 +80,8 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
     setTotalsMismatch(null);
     setLastImageUri(imageUri);
     try {
-      const parsed = await uploadAndParseReceipt(imageUri, userId);
+      const storagePath = await uploadReceiptImage(imageUri, userId);
+      const parsed = await parseReceiptByPath(storagePath);
       const newItems: Item[] = parsed.items.map((it) => ({
         id: generateId(),
         name: it.label,
@@ -87,11 +89,20 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
         quantity: it.quantity,
         assignments: [],
       }));
+      const merchantName = parsed.merchant_name;
+      const shouldAutoTitle = !split.titleUserOverride;
+      const autoTitle = shouldAutoTitle
+        ? generateAutoTitle({ merchantName, category: split.category, createdAt: split.createdAt })
+        : split.titleAuto;
       const nextSplit: Split = {
         ...split,
         items: newItems,
         taxInCents: parsed.tax,
         tipInCents: parsed.tip,
+        receiptImagePath: storagePath,
+        merchantName,
+        titleAuto: autoTitle,
+        ...(shouldAutoTitle ? { name: autoTitle } : {}),
       };
       onUpdate(nextSplit);
       const nextPriceInputs: Record<string, string> = {};
@@ -259,7 +270,21 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
           <Pressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
             <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.6)" />
           </Pressable>
-          <Text style={styles.title}>Receipt Entry</Text>
+          <TextInput
+            style={styles.titleInput}
+            value={split.name}
+            onChangeText={(text) => onUpdate({ ...split, name: text, titleUserOverride: true })}
+            placeholder="Split name"
+            placeholderTextColor="rgba(255,255,255,0.4)"
+          />
+          {split.titleUserOverride && split.titleAuto ? (
+            <Pressable
+              onPress={() => onUpdate({ ...split, name: split.titleAuto!, titleUserOverride: false })}
+              hitSlop={8}
+            >
+              <Ionicons name="refresh" size={18} color="rgba(255,255,255,0.4)" />
+            </Pressable>
+          ) : null}
         </View>
         <Stepper currentStep="receipt" />
 
@@ -276,7 +301,15 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
             {CATEGORIES.map((cat) => (
               <Pressable
                 key={cat}
-                onPress={() => onUpdate({ ...split, category: cat })}
+                onPress={() => {
+                  const updated: Split = { ...split, category: cat };
+                  if (!split.titleUserOverride) {
+                    const autoTitle = generateAutoTitle({ merchantName: split.merchantName, category: cat, createdAt: split.createdAt });
+                    updated.titleAuto = autoTitle;
+                    updated.name = autoTitle;
+                  }
+                  onUpdate(updated);
+                }}
                 style={[styles.chip, split.category === cat && styles.chipSelected]}
               >
                 <Text style={[styles.chipText, split.category === cat && styles.chipTextSelected]}>{cat}</Text>
@@ -320,7 +353,12 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
               <Ionicons name="add" size={24} color="#fff" />
             </Pressable>
           </View>
-          {parseLoading ? (
+          {!userId ? (
+            <View style={styles.guestScanBanner}>
+              <Ionicons name="lock-closed-outline" size={16} color="rgba(255,255,255,0.4)" />
+              <Text style={styles.guestScanText}>Sign in to scan receipts with OCR</Text>
+            </View>
+          ) : parseLoading ? (
             <View style={styles.scanLoadingRow}>
               <ActivityIndicator size="small" color="rgba(255,255,255,0.6)" />
               <Text style={styles.scanLoadingText}>Scanning receipt…</Text>
@@ -497,9 +535,9 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  backBtn: { padding: 8, marginRight: 8 },
-  title: { fontSize: 22, fontWeight: '600', color: '#fff' },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 4 },
+  backBtn: { padding: 8, marginRight: 4 },
+  titleInput: { flex: 1, fontSize: 22, fontWeight: '600', color: '#fff', padding: 0 },
   card: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
@@ -554,6 +592,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   scanBtnSecondaryText: { fontSize: 14, fontWeight: '500', color: '#fff' },
+  guestScanBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    marginBottom: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  guestScanText: { color: 'rgba(255,255,255,0.5)', fontSize: 14 },
   scanLoadingRow: {
     flexDirection: 'row',
     alignItems: 'center',

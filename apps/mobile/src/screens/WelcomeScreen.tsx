@@ -43,6 +43,15 @@ export default function WelcomeScreen() {
         >
           <Text style={styles.secondaryButtonText}>LOG IN</Text>
         </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.guestButton, pressed && styles.pressed]}
+          onPress={() => navigation.navigate('GuestMain')}
+          hitSlop={hitSlop}
+          accessibilityRole="button"
+          accessibilityLabel="Try without an account"
+        >
+          <Text style={styles.guestButtonText}>Try without an account</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -100,5 +109,18 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
     fontSize: 16,
     fontWeight: '600',
+  },
+  guestButton: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    paddingTop: 20,
+    marginTop: 4,
+  },
+  guestButtonText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

@@ -1,11 +1,10 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { getReceiptTotal, formatCurrency } from '@receiptsplit/shared';
 import { useSplits } from '../contexts/SplitsContext';
-import { useFriendRequests } from '../contexts/FriendRequestsContext';
 import { useToast } from '../contexts/ToastContext';
 import { SwipeableRow } from '../components/SwipeableRow';
 import type { Split } from '@receiptsplit/shared';
@@ -22,17 +21,9 @@ function formatDate(ts: number): string {
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'HomeList'>;
 
 export default function HomeScreen() {
-  const { activeSplits, loading, createNewSplit, loadSplit, saveSplit, deleteSplit, restoreSplit, saveError, clearSaveError } = useSplits();
-  const { pendingIncomingCount, pendingSplitCount, refreshPendingCount } = useFriendRequests();
+  const { activeSplits, loading, createNewSplit, loadSplit, saveSplit, deleteSplit, restoreSplit, saveError, clearSaveError, isGuest } = useSplits();
   const { showToast } = useToast();
-  const totalBadgeCount = pendingIncomingCount + pendingSplitCount;
   const navigation = useNavigation<Nav>();
-
-  useFocusEffect(
-    useCallback(() => {
-      refreshPendingCount();
-    }, [refreshPendingCount])
-  );
 
   const onNewSplit = () => {
     const newSplit = createNewSplit();
@@ -61,31 +52,28 @@ export default function HomeScreen() {
         ) : null}
         <View style={styles.headerRow}>
           <Text style={styles.title}>ReceiptSplit</Text>
-          <View style={styles.headerIcons}>
-            <Pressable
-              style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.7 }]}
-              onPress={() => navigation.navigate('Search')}
-              hitSlop={hitSlop}
-              accessibilityRole="button"
-              accessibilityLabel="Search"
-            >
-              <Ionicons name="search" size={24} color="#fff" />
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.7 }]}
-              onPress={() => navigation.navigate('Notifications')}
-              hitSlop={hitSlop}
-              accessibilityRole="button"
-              accessibilityLabel="Notifications"
-            >
-              <Ionicons name="notifications-outline" size={24} color="#fff" />
-              {totalBadgeCount > 0 ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{totalBadgeCount > 9 ? '9+' : totalBadgeCount}</Text>
-                </View>
-              ) : null}
-            </Pressable>
-          </View>
+          {!isGuest ? (
+            <View style={styles.headerIcons}>
+              <Pressable
+                style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.7 }]}
+                onPress={() => navigation.navigate('Search')}
+                hitSlop={hitSlop}
+                accessibilityRole="button"
+                accessibilityLabel="Search"
+              >
+                <Ionicons name="search" size={24} color="#fff" />
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.7 }]}
+                onPress={() => navigation.navigate('Notifications')}
+                hitSlop={hitSlop}
+                accessibilityRole="button"
+                accessibilityLabel="Notifications"
+              >
+                <Ionicons name="notifications-outline" size={24} color="#fff" />
+              </Pressable>
+            </View>
+          ) : null}
         </View>
         <Text style={styles.subtitle}>Split bills in under 60 seconds</Text>
         <Pressable
@@ -132,7 +120,7 @@ export default function HomeScreen() {
                   <View style={styles.cardLeft}>
                     <Text style={styles.cardName}>{item.name}</Text>
                     <Text style={styles.muted}>
-                      {formatDate(item.updatedAt)} · {formatCurrency(getReceiptTotal(item) || 0)} · {item.participants.length} people
+                      {item.merchantName ? `${item.merchantName} · ` : ''}{formatDate(item.updatedAt)} · {formatCurrency(getReceiptTotal(item) || 0)} · {item.participants.length} people
                     </Text>
                   </View>
                 </View>

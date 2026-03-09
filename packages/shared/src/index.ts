@@ -4,3 +4,4 @@ export * from './receiptTotal.js';
 export * from './spending.js';
 export * from './formatting.js';
 export * from './calculations.js';
+export * from './splitTitle.js';

@@ -32,6 +32,10 @@ export interface Split {
   category?: SplitCategory;
   excludeMe?: boolean;
   isDeleted?: boolean;
+  titleAuto?: string;
+  titleUserOverride?: boolean;
+  merchantName?: string;
+  receiptImagePath?: string;
 }
 
 export interface ParticipantBreakdown {

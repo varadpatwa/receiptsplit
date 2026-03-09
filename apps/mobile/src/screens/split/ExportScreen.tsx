@@ -6,16 +6,20 @@ import * as Clipboard from 'expo-clipboard';
 import type { Split } from '@receiptsplit/shared';
 import { calculateBreakdown, getReceiptTotal, generateShareableText } from '@receiptsplit/shared';
 import { Stepper } from '../../components/Stepper';
+import { ReceiptImageModal } from '../../components/ReceiptImageModal';
 
 interface ExportScreenProps {
   split: Split;
   onBack: () => void;
   onReturnHome: () => void;
   onDelete: () => void;
+  isGuest?: boolean;
+  onSaveToAccount?: () => void;
 }
 
-export function ExportScreen({ split, onBack, onReturnHome, onDelete }: ExportScreenProps) {
+export function ExportScreen({ split, onBack, onReturnHome, onDelete, isGuest, onSaveToAccount }: ExportScreenProps) {
   const [toast, setToast] = useState<string | null>(null);
+  const [receiptModalVisible, setReceiptModalVisible] = useState(false);
   const breakdowns = calculateBreakdown(split);
   const shareableText = generateShareableText(split, breakdowns);
 
@@ -75,17 +79,48 @@ export function ExportScreen({ split, onBack, onReturnHome, onDelete }: ExportSc
           </View>
         </View>
 
+        {split.receiptImagePath ? (
+          <Pressable onPress={() => setReceiptModalVisible(true)} style={({ pressed }) => [styles.secondaryBtn, { marginBottom: 16 }, pressed && { opacity: 0.8 }]}>
+            <Ionicons name="receipt-outline" size={20} color="#fff" />
+            <Text style={styles.secondaryBtnText}>View Receipt</Text>
+          </Pressable>
+        ) : null}
+
+        {split.receiptImagePath ? (
+          <ReceiptImageModal
+            visible={receiptModalVisible}
+            storagePath={split.receiptImagePath}
+            onClose={() => setReceiptModalVisible(false)}
+          />
+        ) : null}
+
         {toast ? <Text style={styles.toast}>{toast}</Text> : null}
 
-        <Pressable onPress={onReturnHome} style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.8 }]}>
-          <Ionicons name="home" size={20} color="#000" />
-          <Text style={styles.primaryBtnText}>Return Home</Text>
-        </Pressable>
-
-        <Pressable onPress={onDelete} style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.8 }]}>
-          <Ionicons name="trash-outline" size={20} color="rgba(255,100,100,0.9)" />
-          <Text style={styles.deleteBtnText}>Delete split</Text>
-        </Pressable>
+        {isGuest ? (
+          <>
+            {onSaveToAccount ? (
+              <Pressable onPress={onSaveToAccount} style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.8 }]}>
+                <Ionicons name="cloud-upload-outline" size={20} color="#000" />
+                <Text style={styles.primaryBtnText}>Save to my account</Text>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={onReturnHome} style={({ pressed }) => [styles.secondaryBtn, { marginTop: 8 }, pressed && { opacity: 0.8 }]}>
+              <Ionicons name="checkmark-done" size={20} color="#fff" />
+              <Text style={styles.secondaryBtnText}>Done (temporary)</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Pressable onPress={onReturnHome} style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.8 }]}>
+              <Ionicons name="home" size={20} color="#000" />
+              <Text style={styles.primaryBtnText}>Return Home</Text>
+            </Pressable>
+            <Pressable onPress={onDelete} style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.8 }]}>
+              <Ionicons name="trash-outline" size={20} color="rgba(255,100,100,0.9)" />
+              <Text style={styles.deleteBtnText}>Delete split</Text>
+            </Pressable>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

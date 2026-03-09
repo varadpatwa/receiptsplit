@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Modal, Switch, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, Switch, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -53,7 +53,7 @@ function mergeCategoryTotals(
 const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
 
 export default function SpendingScreen() {
-  const { splits, loading, refetch } = useSplits();
+  const { splits, loading } = useSplits();
   const [period, setPeriod] = useState<SpendingPeriod>('weekly');
   const [confirmedRaw, setConfirmedRaw] = useState<{ totalCents: number }>({ totalCents: 0 });
   const [confirmedShares, setConfirmedShares] = useState<{ totalCents: number; categoryCents: Array<{ category: string; cents: number }> }>({
@@ -64,7 +64,6 @@ export default function SpendingScreen() {
   const [confirmedLoaded, setConfirmedLoaded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [excludeDeleted, setExcludeDeleted] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const prevPeriodRef = useRef(period);
 
@@ -107,12 +106,6 @@ export default function SpendingScreen() {
     loadConfirmed();
   }, [loadConfirmed]));
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([refetch(), loadConfirmed()]);
-    setRefreshing(false);
-  }, [refetch, loadConfirmed]);
-
   const filteredSplits = excludeDeleted ? splits.filter((s) => !s.isDeleted) : splits;
   const periodSplits = getSplitsInRange(filteredSplits, startMs, endMs);
   const ownerCentsTotal = getUserSpendingCents(periodSplits);
@@ -143,7 +136,6 @@ export default function SpendingScreen() {
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="rgba(255,255,255,0.6)" />}
       >
         <View style={styles.headerRow}>
           <View>

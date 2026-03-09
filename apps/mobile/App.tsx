@@ -15,6 +15,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import SignupScreen from './src/screens/SignupScreen';
 import OnboardingUsernameScreen from './src/screens/OnboardingUsernameScreen';
 import MainTabs from './src/navigation/MainTabs';
+import GuestMainTabs from './src/navigation/GuestMainTabs';
 
 const Stack = createNativeStackNavigator();
 
@@ -47,13 +48,20 @@ function AppNavigator() {
   }, [sessionLoaded, userId]);
 
   if (!sessionLoaded) return <LoadingScreen />;
+
+  // Not logged in: show Welcome with guest option
   if (!session || !userId) {
     return (
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Welcome" component={WelcomeScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Signup" component={SignupScreen} />
-      </Stack.Navigator>
+      <SplitsProvider>
+        <ToastProvider>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Welcome" component={WelcomeScreen} />
+            <Stack.Screen name="GuestMain" component={GuestMainTabs} />
+            <Stack.Screen name="Login" component={LoginScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="Signup" component={SignupScreen} options={{ presentation: 'modal' }} />
+          </Stack.Navigator>
+        </ToastProvider>
+      </SplitsProvider>
     );
   }
 
