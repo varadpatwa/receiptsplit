@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -111,20 +112,56 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
     }
   };
 
-  const handleUploadReceipt = async () => {
+  const ensureCameraPermission = async (): Promise<boolean> => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status === 'granted') return true;
+    Alert.alert(
+      'Camera access needed',
+      'Allow camera access in Settings to scan receipts.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => Linking.openSettings() },
+      ],
+    );
+    return false;
+  };
+
+  const handleCameraCapture = async () => {
+    if (!userId) {
+      Alert.alert('Sign in required', 'Please sign in to scan a receipt.');
+      return;
+    }
+    const granted = await ensureCameraPermission();
+    if (!granted) return;
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    await parseImageUri(result.assets[0].uri);
+  };
+
+  const handlePickFromLibrary = async () => {
     if (!userId) {
       Alert.alert('Sign in required', 'Please sign in to scan a receipt.');
       return;
     }
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow access to your photos to upload a receipt.');
+      Alert.alert(
+        'Photo access needed',
+        'Allow photo library access in Settings to choose a receipt image.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
-      aspect: [4, 3],
       quality: 0.8,
     });
     if (result.canceled || !result.assets?.[0]?.uri) return;
@@ -279,26 +316,33 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
         <View style={styles.card}>
           <View style={styles.rowSpace}>
             <Text style={styles.cardTitle}>Items</Text>
-            <View style={styles.itemsHeaderRight}>
+            <Pressable onPress={addItem} style={styles.iconBtn}>
+              <Ionicons name="add" size={24} color="#fff" />
+            </Pressable>
+          </View>
+          {parseLoading ? (
+            <View style={styles.scanLoadingRow}>
+              <ActivityIndicator size="small" color="rgba(255,255,255,0.6)" />
+              <Text style={styles.scanLoadingText}>Scanning receipt…</Text>
+            </View>
+          ) : (
+            <View style={styles.scanRow}>
               <Pressable
-                onPress={handleUploadReceipt}
-                disabled={parseLoading}
-                style={[styles.scanBtn, parseLoading && styles.scanBtnDisabled]}
+                onPress={handleCameraCapture}
+                style={styles.scanBtn}
               >
-                {parseLoading ? (
-                  <ActivityIndicator size="small" color="#0B0B0C" />
-                ) : (
-                  <>
-                    <Ionicons name="camera-outline" size={20} color="#0B0B0C" />
-                    <Text style={styles.scanBtnText}>Scan receipt</Text>
-                  </>
-                )}
+                <Ionicons name="camera" size={18} color="#0B0B0C" />
+                <Text style={styles.scanBtnText}>Scan with camera</Text>
               </Pressable>
-              <Pressable onPress={addItem} style={styles.iconBtn}>
-                <Ionicons name="add" size={24} color="#fff" />
+              <Pressable
+                onPress={handlePickFromLibrary}
+                style={styles.scanBtnSecondary}
+              >
+                <Ionicons name="images-outline" size={18} color="#fff" />
+                <Text style={styles.scanBtnSecondaryText}>Choose from photos</Text>
               </Pressable>
             </View>
-          </View>
+          )}
           {parseError ? (
             <View style={styles.parseErrorBanner}>
               <Text style={styles.parseErrorText}>{parseError}</Text>
@@ -481,17 +525,44 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   rowSpace: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   itemsHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  scanRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
   scanBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 8,
   },
-  scanBtnDisabled: { opacity: 0.7 },
   scanBtnText: { fontSize: 14, fontWeight: '600', color: '#0B0B0C' },
+  scanBtnSecondary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  scanBtnSecondaryText: { fontSize: 14, fontWeight: '500', color: '#fff' },
+  scanLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  scanLoadingText: { color: 'rgba(255,255,255,0.6)', fontSize: 14 },
   parseErrorBanner: {
     backgroundColor: 'rgba(239,68,68,0.15)',
     borderWidth: 1,
