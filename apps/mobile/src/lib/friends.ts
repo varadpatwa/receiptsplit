@@ -4,6 +4,7 @@ export interface Friend {
   id: string;
   handle: string;
   display_name: string | null;
+  avatar_url: string | null;
 }
 
 /**
@@ -32,14 +33,14 @@ export async function listFriends(): Promise<Friend[]> {
 
   const { data: profileRows, error: profileError } = await supabase
     .from('profiles')
-    .select('id, handle, display_name')
+    .select('id, handle, display_name, avatar_url')
     .in('id', friendIds);
 
   if (profileError) {
     throw new Error(`Failed to load friend profiles: ${profileError.message}`);
   }
 
-  const profiles = (profileRows ?? []) as Array<{ id: string; handle: string; display_name: string | null }>;
+  const profiles = (profileRows ?? []) as Array<{ id: string; handle: string; display_name: string | null; avatar_url: string | null }>;
   if (friendIds.length > 0 && profiles.length === 0) {
     if (__DEV__) {
       console.warn(
@@ -54,7 +55,7 @@ export async function listFriends(): Promise<Friend[]> {
     .map((id) => {
       const p = byId.get(id);
       if (!p) return null;
-      return { id: p.id, handle: p.handle, display_name: p.display_name };
+      return { id: p.id, handle: p.handle, display_name: p.display_name, avatar_url: p.avatar_url };
     })
     .filter((f): f is Friend => f !== null);
 

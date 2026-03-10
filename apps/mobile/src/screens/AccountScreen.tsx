@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { Avatar } from '../components/Avatar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { T } from '../theme/colors';
 import { AuroraBackground } from '../components/AuroraBackground';
 
 const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
 import { useAuth } from '../contexts/AuthContext';
-import { getProfile, upsertProfile, isHandleAvailable } from '../lib/supabase';
+import { getProfile, upsertProfile, isHandleAvailable, uploadAvatar, getAvatarPublicUrl } from '../lib/supabase';
 import { validateHandle } from '@receiptsplit/shared';
 import { supabase } from '../lib/supabase';
 
-type Profile = { id: string; handle: string; display_name: string | null };
+type Profile = { id: string; handle: string; display_name: string | null; avatar_url: string | null };
 
 export default function AccountScreen() {
   const { userId, email, session } = useAuth();
@@ -23,6 +25,8 @@ export default function AccountScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarCacheBust, setAvatarCacheBust] = useState(0);
 
   useEffect(() => {
     if (!userId) {
@@ -39,6 +43,33 @@ export default function AccountScreen() {
       })
       .catch(() => setProfile(null));
   }, [userId]);
+
+  const avatarDisplayUrl = profile?.avatar_url
+    ? getAvatarPublicUrl(profile.avatar_url) + (avatarCacheBust ? `?t=${avatarCacheBust}` : '')
+    : null;
+
+  const handleChangePhoto = async () => {
+    if (!userId || !profile) return;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      setAvatarUploading(true);
+      setError(null);
+      const path = await uploadAvatar(result.assets[0].uri, userId);
+      const updated = await upsertProfile(profile.handle, profile.display_name || undefined, path);
+      setProfile(updated);
+      setAvatarCacheBust(Date.now());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to upload photo');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   const handleSaveHandle = async () => {
     if (!profile) return;
@@ -111,6 +142,22 @@ export default function AccountScreen() {
       <Text style={styles.subtitle}>Manage your profile.</Text>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Profile</Text>
+        {/* Avatar */}
+        <View style={styles.avatarSection}>
+          <Avatar
+            name={profile?.display_name || profile?.handle || 'U'}
+            avatarUrl={avatarDisplayUrl}
+            size={80}
+          />
+          <AnimatedPressable
+            onPress={handleChangePhoto}
+            disabled={avatarUploading}
+            style={({ pressed }) => [styles.changePhotoBtn, pressed && { opacity: 0.8 }, avatarUploading && styles.buttonDisabled]}
+            hitSlop={hitSlop}
+          >
+            <Text style={styles.changePhotoText}>{avatarUploading ? 'Uploading...' : 'Change Photo'}</Text>
+          </AnimatedPressable>
+        </View>
         <Text style={styles.label}>Handle</Text>
         {editingHandle ? (
           <View style={styles.editRow}>
@@ -212,6 +259,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cardTitle: { fontSize: 18, fontWeight: '600', color: '#fff', marginBottom: 16 },
+  avatarSection: { alignItems: 'center', marginBottom: 20 },
+  changePhotoBtn: {
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  changePhotoText: { color: '#fff', fontSize: 13, fontWeight: '500' },
   label: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 8 },
   value: { color: '#fff', fontSize: 16 },
   valueMuted: { color: 'rgba(255,255,255,0.6)', fontSize: 16, marginBottom: 16 },

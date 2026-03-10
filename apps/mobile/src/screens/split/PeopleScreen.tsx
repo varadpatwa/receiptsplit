@@ -17,6 +17,8 @@ import { getRecentPeople, recordRecentPerson } from '../../lib/recentPeople';
 import { useAuth } from '../../contexts/AuthContext';
 import { Stepper } from '../../components/Stepper';
 import { AnimatedPressable } from '../../components/AnimatedPressable';
+import { Avatar } from '../../components/Avatar';
+import { useParticipantAvatars } from '../../hooks/useParticipantAvatars';
 import { T } from '../../theme/colors';
 import { AuroraBackground } from '../../components/AuroraBackground';
 
@@ -166,6 +168,7 @@ export function PeopleScreen({ split, onUpdate, onNext, onBack }: PeopleScreenPr
     });
   };
 
+  const avatarMap = useParticipantAvatars(split.participants);
   const canProceed = split.participants.length >= 2;
 
   const renderSuggestionItem = (item: Suggestion, index: number) => {
@@ -251,9 +254,7 @@ export function PeopleScreen({ split, onUpdate, onNext, onBack }: PeopleScreenPr
             {split.participants.map((p, index) => (
               <View key={p.id} style={styles.participantRow}>
                 <View style={styles.participantLeft}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{index + 1}</Text>
-                  </View>
+                  <Avatar name={p.name} avatarUrl={avatarMap.get(p.id)} size={40} />
                   <View>
                     <Text style={styles.participantName}>{p.name}</Text>
                     {p.id === 'me' ? (

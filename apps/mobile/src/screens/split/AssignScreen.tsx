@@ -7,6 +7,8 @@ import type { Split, ItemAssignment } from '@receiptsplit/shared';
 import { formatCurrency, getRunningTally, allItemsAssigned } from '@receiptsplit/shared';
 import { Stepper } from '../../components/Stepper';
 import { ParticipantChip } from '../../components/ParticipantChip';
+import { Avatar } from '../../components/Avatar';
+import { useParticipantAvatars } from '../../hooks/useParticipantAvatars';
 import {
   getAssignmentFrequency,
   suggestAssignments,
@@ -46,6 +48,7 @@ export function AssignScreen({ split, onUpdate, onNext, onBack, subtitle }: Assi
     };
   }, [userId, split.id, split.items.length, split.participants.length]);
 
+  const avatarMap = useParticipantAvatars(split.participants);
   const runningTally = getRunningTally(split);
   const allAssigned = allItemsAssigned(split);
   const unassignedItems = split.items.filter((item) => item.assignments.length === 0);
@@ -152,7 +155,10 @@ export function AssignScreen({ split, onUpdate, onNext, onBack, subtitle }: Assi
             const tally = runningTally.get(p.id) ?? 0;
             return (
               <View key={p.id} style={styles.tallyRow}>
-                <Text style={styles.tallyName}>{p.name}</Text>
+                <View style={styles.tallyLeft}>
+                  <Avatar name={p.name} avatarUrl={avatarMap.get(p.id)} size={24} />
+                  <Text style={styles.tallyName}>{p.name}</Text>
+                </View>
                 <Text style={styles.tallyValue}>{formatCurrency(Math.round(tally))}</Text>
               </View>
             );
@@ -227,6 +233,7 @@ export function AssignScreen({ split, onUpdate, onNext, onBack, subtitle }: Assi
                     name={p.name}
                     selected={isAssigned(item.id, p.id)}
                     onToggle={() => toggleAssignment(item.id, p.id)}
+                    avatarUrl={avatarMap.get(p.id)}
                   />
                 ))}
               </View>
@@ -265,7 +272,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cardTitle: { fontSize: 16, fontWeight: '600', color: '#fff', marginBottom: 12 },
-  tallyRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  tallyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  tallyLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   tallyName: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
   tallyValue: { fontWeight: '600', color: '#fff' },
   warning: {

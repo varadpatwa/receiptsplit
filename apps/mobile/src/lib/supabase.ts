@@ -21,6 +21,7 @@ export interface Profile {
   id: string;
   handle: string;
   display_name: string | null;
+  avatar_url: string | null;
 }
 
 export async function getProfile(): Promise<Profile | null> {
@@ -32,16 +33,39 @@ export async function getProfile(): Promise<Profile | null> {
   return data;
 }
 
-export async function upsertProfile(handle: string, displayName?: string): Promise<Profile> {
+export async function upsertProfile(handle: string, displayName?: string, avatarUrl?: string): Promise<Profile> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
-  const { data, error } = await supabase.from('profiles').upsert({
+  const payload: Record<string, unknown> = {
     id: user.id,
     handle: handle.toLowerCase().trim(),
     display_name: displayName?.trim() || null,
-  }).select().single();
+  };
+  if (avatarUrl !== undefined) payload.avatar_url = avatarUrl;
+  const { data, error } = await supabase.from('profiles').upsert(payload).select().single();
   if (error) throw new Error(error.message);
   return data;
+}
+
+export function getAvatarPublicUrl(storagePath: string): string {
+  return supabase.storage.from('avatars').getPublicUrl(storagePath).data.publicUrl;
+}
+
+export async function uploadAvatar(uri: string, userId: string): Promise<string> {
+  const { manipulateAsync, SaveFormat } = await import('expo-image-manipulator');
+  const manipulated = await manipulateAsync(uri, [{ resize: { width: 256, height: 256 } }], {
+    compress: 0.7,
+    format: SaveFormat.JPEG,
+  });
+  const response = await fetch(manipulated.uri);
+  const blob = await response.blob();
+  const path = `${userId}/avatar.jpg`;
+  const { error } = await supabase.storage.from('avatars').upload(path, blob, {
+    upsert: true,
+    contentType: 'image/jpeg',
+  });
+  if (error) throw new Error(`Avatar upload failed: ${error.message}`);
+  return path;
 }
 
 export async function isHandleAvailable(handle: string): Promise<boolean> {

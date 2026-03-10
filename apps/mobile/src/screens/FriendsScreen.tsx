@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { Avatar } from '../components/Avatar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { T } from '../theme/colors';
 import { AuroraBackground } from '../components/AuroraBackground';
+import { getAvatarPublicUrl } from '../lib/supabase';
 
 const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
 import { useAuth } from '../contexts/AuthContext';
@@ -157,9 +159,12 @@ export default function FriendsScreen() {
           <View style={styles.results}>
             {searchResults.map((p) => (
               <View key={p.id} style={styles.resultRow}>
-                <View>
-                  <Text style={styles.handle}>@{p.handle}</Text>
-                  {p.display_name ? <Text style={styles.muted}>{p.display_name}</Text> : null}
+                <View style={styles.profileRow}>
+                  <Avatar name={p.display_name || p.handle} size={36} />
+                  <View>
+                    <Text style={styles.handle}>@{p.handle}</Text>
+                    {p.display_name ? <Text style={styles.muted}>{p.display_name}</Text> : null}
+                  </View>
                 </View>
                 {isFriend(p.id) ? (
                   <Text style={styles.muted}>Already friends</Text>
@@ -230,9 +235,12 @@ export default function FriendsScreen() {
         ) : (
           friends.map((f) => (
             <View key={f.id} style={styles.resultRow}>
-              <View>
-                <Text style={styles.handle}>@{f.handle}</Text>
-                {f.display_name ? <Text style={styles.muted}>{f.display_name}</Text> : null}
+              <View style={styles.profileRow}>
+                <Avatar name={f.display_name || f.handle} avatarUrl={f.avatar_url ? getAvatarPublicUrl(f.avatar_url) : null} size={36} />
+                <View>
+                  <Text style={styles.handle}>@{f.handle}</Text>
+                  {f.display_name ? <Text style={styles.muted}>{f.display_name}</Text> : null}
+                </View>
               </View>
               <AnimatedPressable onPress={() => handleRemoveFriend(f.id)} disabled={loading} hitSlop={hitSlop} style={({ pressed }) => pressed && !loading && { opacity: 0.8 }}>
                 <Text style={styles.removeText}>Remove</Text>
@@ -278,6 +286,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: T.borderSubtle,
   },
+  profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   handle: { fontSize: 16, fontWeight: '500', color: '#fff' },
   row: { flexDirection: 'row', gap: 8 },
   smallButton: {

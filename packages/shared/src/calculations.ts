@@ -188,5 +188,7 @@ export function calculateEventBreakdown(
 export function calculateEventSettlement(
   splits: Split[]
 ): { name: string; owes: number }[] {
-  return calculateEventBreakdown(splits).filter((b) => b.total > 0);
+  return calculateEventBreakdown(splits)
+    .filter((b) => b.total > 0)
+    .map((b) => ({ name: b.name, owes: b.total }));
 }

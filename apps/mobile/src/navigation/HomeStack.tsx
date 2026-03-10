@@ -177,7 +177,8 @@ function MultiSplitCaptureConnector() {
           await createFromCaptures(captures);
           navigation.navigate('MultiSplitPeople');
         } catch (e) {
-          Alert.alert('Error', 'Failed to create split. Please try again.');
+          const msg = e instanceof Error ? e.message : String(e);
+          Alert.alert('Error', `Failed to create split: ${msg}`);
         }
       }}
       onBack={() => navigation.goBack()}
