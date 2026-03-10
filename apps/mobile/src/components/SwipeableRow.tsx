@@ -15,11 +15,11 @@ import {
   Animated,
   Dimensions,
   PanResponder,
-  Pressable,
   StyleSheet,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { AnimatedPressable } from './AnimatedPressable';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ACTION_WIDTH = 76;
@@ -210,11 +210,11 @@ export function SwipeableRow({ children, onDelete }: SwipeableRowProps) {
     >
       {/* Stationary delete button behind the row */}
       <View style={styles.actionTrack}>
-        <Pressable onPress={handleDeletePress} style={styles.deleteButton}>
+        <AnimatedPressable onPress={handleDeletePress} style={styles.deleteButton}>
           <View style={styles.trashCircle}>
             <Ionicons name="trash" size={20} color="#fff" />
           </View>
-        </Pressable>
+        </AnimatedPressable>
       </View>
 
       {/* Foreground row content */}

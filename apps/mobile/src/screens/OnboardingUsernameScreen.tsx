@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable } from 'react-native';
+import { View, Text, TextInput, StyleSheet } from 'react-native';
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { validateHandle } from '@receiptsplit/shared';
 import { upsertProfile, isHandleAvailable } from '../lib/supabase';
 import { useProfileRefresh } from '../contexts/ProfileRefreshContext';
+import { T } from '../theme/colors';
+import { AuroraBackground } from '../components/AuroraBackground';
 
 export default function OnboardingUsernameScreen() {
   const profileRefresh = useProfileRefresh();
@@ -56,6 +59,7 @@ export default function OnboardingUsernameScreen() {
   };
 
   return (
+    <AuroraBackground>
     <View style={styles.container}>
       <View style={styles.inner}>
         <Text style={styles.title}>Choose your handle</Text>
@@ -93,7 +97,7 @@ export default function OnboardingUsernameScreen() {
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
-          <Pressable
+          <AnimatedPressable
             style={({ pressed }) => [styles.button, (loading || !isValidFormat || checkingAvailability || !!error) && styles.buttonDisabled, pressed && !loading && { opacity: 0.8 }]}
             onPress={handleSubmit}
             disabled={loading || !isValidFormat || checkingAvailability || !!error}
@@ -101,28 +105,29 @@ export default function OnboardingUsernameScreen() {
             accessibilityRole="button"
           >
             <Text style={styles.buttonText}>{loading ? 'Creating profile...' : 'Continue'}</Text>
-          </Pressable>
+          </AnimatedPressable>
         </View>
       </View>
     </View>
+    </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0B0B0C' },
+  container: { flex: 1, backgroundColor: 'transparent' },
   inner: { flex: 1, padding: 20, paddingTop: 60 },
   title: { fontSize: 28, fontWeight: '600', color: '#fff', marginBottom: 8 },
   subtitle: { color: 'rgba(255,255,255,0.6)', marginBottom: 24 },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 20,
   },
   label: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 8 },
   input: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: T.inputBg,
     borderRadius: 8,
     padding: 12,
     color: '#fff',
@@ -141,11 +146,11 @@ const styles = StyleSheet.create({
   },
   errorText: { color: '#f87171', fontSize: 14 },
   button: {
-    backgroundColor: '#fff',
+    backgroundColor: T.ctaBg,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#000', fontSize: 16, fontWeight: '600' },
+  buttonText: { color: T.ctaText, fontSize: 16, fontWeight: '600' },
 });

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, Text, StyleSheet } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
+import { AnimatedPressable } from './AnimatedPressable';
 
 interface ParticipantChipProps {
   name: string;
@@ -9,7 +10,7 @@ interface ParticipantChipProps {
 
 export function ParticipantChip({ name, selected, onToggle }: ParticipantChipProps) {
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={onToggle}
       style={({ pressed }) => [
         styles.chip,
@@ -18,7 +19,7 @@ export function ParticipantChip({ name, selected, onToggle }: ParticipantChipPro
       ]}
     >
       <Text style={[styles.text, selected && styles.textSelected]}>{name}</Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

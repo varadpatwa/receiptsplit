@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
   TextInput,
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +16,9 @@ import { listFriends, type Friend } from '../../lib/friends';
 import { getRecentPeople, recordRecentPerson } from '../../lib/recentPeople';
 import { useAuth } from '../../contexts/AuthContext';
 import { Stepper } from '../../components/Stepper';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
+import { T } from '../../theme/colors';
+import { AuroraBackground } from '../../components/AuroraBackground';
 
 type Suggestion =
   | { type: 'friend'; friend: Friend }
@@ -175,25 +177,26 @@ export function PeopleScreen({ split, onUpdate, onNext, onBack }: PeopleScreenPr
     } else if (item.type === 'recent') displayText = item.name;
     else displayText = `Add "${item.name}" as Temp`;
     return (
-      <Pressable
+      <AnimatedPressable
         key={index}
         onPress={() => handleSuggestionSelect(item)}
         style={({ pressed }) => [styles.suggestionRow, pressed && { backgroundColor: 'rgba(255,255,255,0.05)' }]}
       >
         <Text style={styles.suggestionText}>{displayText}</Text>
         {badge ? <Text style={styles.suggestionBadge}>{badge}</Text> : null}
-      </Pressable>
+      </AnimatedPressable>
     );
   };
 
   return (
+    <AuroraBackground>
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <Pressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
+          <AnimatedPressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
             <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.6)" />
-          </Pressable>
+          </AnimatedPressable>
           <Text style={styles.title}>Add People</Text>
         </View>
         <Stepper currentStep="people" />
@@ -208,13 +211,13 @@ export function PeopleScreen({ split, onUpdate, onNext, onBack }: PeopleScreenPr
               value={newName}
               onChangeText={setNewName}
             />
-            <Pressable
+            <AnimatedPressable
               onPress={() => newName.trim() && addParticipantAsTemp(newName.trim())}
               style={[styles.addBtn, !newName.trim() && styles.addBtnDisabled]}
               disabled={!newName.trim()}
             >
               <Ionicons name="checkmark" size={24} color="#000" />
-            </Pressable>
+            </AnimatedPressable>
           </View>
           {suggestions.length > 0 ? (
             <View style={styles.suggestionsBox}>
@@ -226,13 +229,13 @@ export function PeopleScreen({ split, onUpdate, onNext, onBack }: PeopleScreenPr
               <Text style={styles.muted}>Recent</Text>
               <View style={styles.recentChips}>
                 {availableRecent.slice(0, 5).map((name) => (
-                  <Pressable
+                  <AnimatedPressable
                     key={name}
                     onPress={() => addByNameOrFriend(name)}
                     style={({ pressed }) => [styles.recentChip, pressed && { opacity: 0.8 }]}
                   >
                     <Text style={styles.recentChipText}>{name}</Text>
-                  </Pressable>
+                  </AnimatedPressable>
                 ))}
               </View>
             </View>
@@ -261,9 +264,9 @@ export function PeopleScreen({ split, onUpdate, onNext, onBack }: PeopleScreenPr
                   </View>
                 </View>
                 {p.id !== 'me' && (
-                  <Pressable onPress={() => deleteParticipant(p.id)} style={styles.deleteBtn}>
+                  <AnimatedPressable onPress={() => deleteParticipant(p.id)} style={styles.deleteBtn}>
                     <Ionicons name="trash-outline" size={20} color="rgba(255,100,100,0.9)" />
-                  </Pressable>
+                  </AnimatedPressable>
                 )}
               </View>
             ))}
@@ -273,21 +276,22 @@ export function PeopleScreen({ split, onUpdate, onNext, onBack }: PeopleScreenPr
         {!canProceed && (
           <Text style={styles.helpText}>Need at least 2 people to split the bill</Text>
         )}
-        <Pressable
+        <AnimatedPressable
           onPress={handleNext}
           disabled={!canProceed}
           style={({ pressed }) => [styles.nextBtn, !canProceed && styles.nextBtnDisabled, pressed && { opacity: 0.8 }]}
         >
           <Text style={styles.nextBtnText}>Next: Assign Items</Text>
-        </Pressable>
+        </AnimatedPressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+    </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
@@ -295,10 +299,10 @@ const styles = StyleSheet.create({
   backBtn: { padding: 8, marginRight: 8 },
   title: { fontSize: 22, fontWeight: '600', color: '#fff' },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 16,
     marginBottom: 16,
   },
@@ -315,9 +319,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },
-  addBtn: { backgroundColor: '#fff', padding: 12, borderRadius: 8 },
+  addBtn: { backgroundColor: T.ctaBg, padding: 12, borderRadius: 8 },
   addBtnDisabled: { opacity: 0.5 },
-  suggestionsBox: { maxHeight: 220, marginTop: 8, borderRadius: 8, overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.2)' },
+  suggestionsBox: { maxHeight: 220, marginTop: 8, borderRadius: 8, overflow: 'hidden', backgroundColor: T.inputBg },
   suggestionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
   suggestionText: { color: '#fff', fontSize: 16 },
   suggestionBadge: { fontSize: 12, color: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 9999 },
@@ -334,7 +338,7 @@ const styles = StyleSheet.create({
   participantMeta: { fontSize: 12, color: 'rgba(255,255,255,0.5)' },
   deleteBtn: { padding: 8 },
   helpText: { textAlign: 'center', color: 'rgba(255,255,255,0.6)', marginBottom: 8 },
-  nextBtn: { backgroundColor: '#fff', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  nextBtn: { backgroundColor: T.ctaBg, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   nextBtnDisabled: { opacity: 0.5 },
-  nextBtnText: { color: '#000', fontSize: 16, fontWeight: '600' },
+  nextBtnText: { color: T.ctaText, fontSize: 16, fontWeight: '600' },
 });

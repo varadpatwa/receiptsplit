@@ -1,13 +1,16 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Modal, Switch, ScrollView, ActivityIndicator, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, Modal, Switch, ScrollView, ActivityIndicator, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { getSplitsInRange, getPeriodStart, getPeriodEnd, getPeriodLabel, getUserSpendingCents, getUserShareCents, getCategoryTotals, formatCurrency } from '@receiptsplit/shared';
 import type { Split, SpendingPeriod, CategoryTotal } from '@receiptsplit/shared';
 import { useSplits } from '../contexts/SplitsContext';
 import { getConfirmedFriendSharesForRange, getConfirmedSharesForRange } from '../lib/splitFriendRequests';
 import { DonutChart, type DonutSegment } from '../components/DonutChart';
+import { T } from '../theme/colors';
+import { AuroraBackground } from '../components/AuroraBackground';
 
 const PERIODS: SpendingPeriod[] = ['daily', 'weekly', 'monthly'];
 const PERIOD_MENU_LABELS: Record<SpendingPeriod, string> = {
@@ -61,9 +64,11 @@ function formatDate(ts: number): string {
 }
 
 export default function SpendingScreen() {
+  const navigation = useNavigation<any>();
   const { splits, loading } = useSplits();
   const [period, setPeriod] = useState<SpendingPeriod>('weekly');
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [selectedDonutCategory, setSelectedDonutCategory] = useState<string | null>(null);
   const [confirmedRaw, setConfirmedRaw] = useState<{ totalCents: number }>({ totalCents: 0 });
   const [confirmedShares, setConfirmedShares] = useState<{ totalCents: number; categoryCents: Array<{ category: string; cents: number }> }>({
     totalCents: 0,
@@ -140,6 +145,7 @@ export default function SpendingScreen() {
   const toggleCategory = (category: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedCategory((prev) => (prev === category ? null : category));
+    setSelectedDonutCategory((prev) => (prev === category ? null : category));
   };
 
   const donutSegments: DonutSegment[] = mergedCategoryTotals
@@ -158,7 +164,7 @@ export default function SpendingScreen() {
     : '';
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <AuroraBackground><SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
@@ -169,7 +175,7 @@ export default function SpendingScreen() {
             <Text style={styles.subtitle}>Your share of splits</Text>
           </View>
           <View>
-            <Pressable
+            <AnimatedPressable
               style={({ pressed }) => [styles.periodButton, pressed && { opacity: 0.7 }]}
               onPress={() => setMenuOpen(true)}
               hitSlop={hitSlop}
@@ -178,16 +184,16 @@ export default function SpendingScreen() {
             >
               <Text style={styles.periodButtonText}>{PERIOD_MENU_LABELS[period]}</Text>
               <Ionicons name="calendar-outline" size={20} color="#fff" />
-            </Pressable>
+            </AnimatedPressable>
           </View>
         </View>
 
         {/* Period dropdown */}
         <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-          <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
+          <AnimatedPressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
             <View style={styles.menuContainer}>
               {PERIODS.map((p) => (
-                <Pressable
+                <AnimatedPressable
                   key={p}
                   style={({ pressed }) => [
                     styles.menuItem,
@@ -200,10 +206,10 @@ export default function SpendingScreen() {
                     {PERIOD_MENU_LABELS[p]}
                   </Text>
                   {period === p && <Ionicons name="checkmark" size={18} color="#fff" />}
-                </Pressable>
+                </AnimatedPressable>
               ))}
             </View>
-          </Pressable>
+          </AnimatedPressable>
         </Modal>
 
         {isLoading ? (
@@ -219,6 +225,7 @@ export default function SpendingScreen() {
                   totalCents={totalCents}
                   formatCurrency={formatCurrency}
                   periodLabel={periodLabel}
+                  selectedCategory={selectedDonutCategory}
                 />
               ) : (
                 <>
@@ -237,9 +244,13 @@ export default function SpendingScreen() {
                     const categorySplits = splitsByCategory.get(c.category) ?? [];
                     return (
                       <View key={c.category}>
-                        <Pressable
+                        <AnimatedPressable
                           onPress={() => toggleCategory(c.category)}
-                          style={[styles.categoryRow, isExpanded && styles.categoryRowExpanded]}
+                          style={[
+                            styles.categoryRow,
+                            isExpanded && styles.categoryRowExpanded,
+                            selectedDonutCategory === c.category && styles.categoryRowSelected,
+                          ]}
                         >
                           <View style={styles.categoryLeft}>
                             <View style={[styles.categoryDot, { backgroundColor: getCategoryColor(c.category) }]} />
@@ -254,7 +265,7 @@ export default function SpendingScreen() {
                               color="rgba(255,255,255,0.4)"
                             />
                           </View>
-                        </Pressable>
+                        </AnimatedPressable>
                         {isExpanded && categorySplits.length > 0 && (
                           <View style={styles.categoryDetail}>
                             {categorySplits
@@ -287,6 +298,19 @@ export default function SpendingScreen() {
                 <Text style={styles.emptySubtext}>Splits you add will show here by category.</Text>
               </View>
             )}
+            {/* Ask Penny */}
+            <AnimatedPressable
+              style={({ pressed }) => [styles.askPennyButton, pressed && { opacity: 0.7 }]}
+              onPress={() => navigation.navigate('Home', { screen: 'Search' })}
+            >
+              <Ionicons name="sparkles" size={18} color="rgba(168,85,247,0.8)" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.askPennyTitle}>Ask Penny about your spending</Text>
+                <Text style={styles.askPennySubtitle}>Get insights, comparisons, and breakdowns</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.3)" />
+            </AnimatedPressable>
+
             <View style={styles.toggleRow}>
               <Text style={styles.toggleLabel}>Exclude deleted splits</Text>
               <Switch
@@ -302,12 +326,12 @@ export default function SpendingScreen() {
           <Text style={styles.lastUpdated}>{lastUpdatedLabel}</Text>
         ) : null}
       </ScrollView>
-    </SafeAreaView>
+    </SafeAreaView></AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1 },
   scrollContent: { padding: 20, paddingTop: 16, paddingBottom: 40 },
   headerRow: {
@@ -322,7 +346,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: T.chipBg,
+    borderWidth: 1,
+    borderColor: T.chipBorder,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 20,
@@ -342,7 +368,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   menuContainer: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: T.menuBg,
     borderRadius: 12,
     minWidth: 160,
     overflow: 'hidden',
@@ -357,7 +383,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   menuItemActive: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: T.chipActiveBg,
   },
   menuItemText: {
     color: 'rgba(255,255,255,0.7)',
@@ -370,10 +396,10 @@ const styles = StyleSheet.create({
   muted: { color: 'rgba(255,255,255,0.6)' },
   loadingContainer: { paddingTop: 60, alignItems: 'center' },
   totalCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
+    backgroundColor: T.cardBg,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 24,
     alignItems: 'center',
     marginBottom: 24,
@@ -391,8 +417,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: T.cardBorder,
+    backgroundColor: T.cardBg,
+  },
+  categoryRowSelected: {
+    borderColor: T.chipActiveBorder,
+    backgroundColor: T.chipActiveBg,
   },
   categoryLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   categoryDot: { width: 12, height: 12, borderRadius: 6 },
@@ -406,10 +436,10 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   categoryDetail: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: T.cardBgSubtle,
     borderWidth: 1,
     borderTopWidth: 0,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     borderBottomLeftRadius: 8,
     borderBottomRightRadius: 8,
     paddingHorizontal: 16,
@@ -426,11 +456,11 @@ const styles = StyleSheet.create({
   },
   detailLeft: { flex: 1, marginRight: 12 },
   detailName: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '500' },
-  detailMeta: { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 },
+  detailMeta: { color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 },
   detailAmount: { color: '#fff', fontSize: 14, fontWeight: '600' },
   emptyState: { paddingVertical: 32, alignItems: 'center' },
   emptyText: { color: 'rgba(255,255,255,0.6)', fontSize: 16 },
-  emptySubtext: { color: 'rgba(255,255,255,0.4)', fontSize: 14, marginTop: 8 },
+  emptySubtext: { color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 8 },
   toggleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -440,12 +470,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: T.cardBorder,
+    backgroundColor: T.cardBg,
   },
   toggleLabel: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 15,
+  },
+  askPennyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: T.pennyBorder,
+    backgroundColor: T.pennyBg,
+  },
+  askPennyTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  askPennySubtitle: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    marginTop: 2,
   },
   lastUpdated: {
     textAlign: 'center',

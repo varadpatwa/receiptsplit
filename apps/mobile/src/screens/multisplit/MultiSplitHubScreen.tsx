@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, Alert, Image, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, Alert, Image, ActivityIndicator,
 } from 'react-native';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -9,6 +10,8 @@ import {
 } from '@receiptsplit/shared';
 import type { Split, SplitEvent, SplitCategory } from '@receiptsplit/shared';
 import { supabase } from '../../lib/supabase';
+import { T } from '../../theme/colors';
+import { AuroraBackground } from '../../components/AuroraBackground';
 
 interface Props {
   event: SplitEvent;
@@ -82,12 +85,13 @@ export default function MultiSplitHubScreen({
   };
 
   return (
+    <AuroraBackground>
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
         <View style={styles.headerRow}>
-          <Pressable onPress={handleBack} hitSlop={12}>
+          <AnimatedPressable onPress={handleBack} hitSlop={12}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
-          </Pressable>
+          </AnimatedPressable>
           <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
           <View style={{ width: 24 }} />
         </View>
@@ -103,27 +107,32 @@ export default function MultiSplitHubScreen({
           </View>
 
           {/* Category */}
-          <View style={styles.categoryRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoryScroll}
+            contentContainerStyle={styles.categoryRow}
+          >
             {CATEGORIES.map((cat) => {
               const selected = eventSplits.length > 0 && eventSplits[0].category === cat;
               return (
-                <Pressable
+                <AnimatedPressable
                   key={cat}
                   onPress={() => onCategoryChange(cat)}
                   style={[styles.categoryChip, selected && styles.categoryChipSelected]}
                 >
                   <Text style={[styles.categoryChipText, selected && styles.categoryChipTextSelected]}>{cat}</Text>
-                </Pressable>
+                </AnimatedPressable>
               );
             })}
-          </View>
+          </ScrollView>
 
           {/* Receipts with photos */}
           {eventSplits.length > 0 ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Receipts</Text>
               {eventSplits.map((split) => (
-                <Pressable
+                <AnimatedPressable
                   key={split.id}
                   style={({ pressed }) => [styles.receiptCard, pressed && { opacity: 0.8 }]}
                   onPress={() => onTapReceipt(split.id)}
@@ -141,35 +150,35 @@ export default function MultiSplitHubScreen({
                       {split.items.length} item{split.items.length !== 1 ? 's' : ''} · {formatCurrency(getReceiptTotal(split))}
                     </Text>
                   </View>
-                  <Pressable
+                  <AnimatedPressable
                     onPress={() => handleRemove(split.id, split.name)}
                     hitSlop={12}
                     style={styles.removeBtn}
                   >
                     <Ionicons name="close-circle" size={22} color="rgba(255,100,100,0.6)" />
-                  </Pressable>
-                </Pressable>
+                  </AnimatedPressable>
+                </AnimatedPressable>
               ))}
             </View>
           ) : null}
 
           {/* Action Buttons */}
           <View style={styles.actionRow}>
-            <Pressable
+            <AnimatedPressable
               style={({ pressed }) => [styles.addReceiptButton, pressed && { opacity: 0.8 }]}
               onPress={onAddReceipt}
             >
               <Ionicons name="add-circle-outline" size={22} color="#000" />
               <Text style={styles.addReceiptText}>Add Receipt</Text>
-            </Pressable>
+            </AnimatedPressable>
             {eventSplits.length > 0 ? (
-              <Pressable
+              <AnimatedPressable
                 style={({ pressed }) => [styles.assignButton, pressed && { opacity: 0.8 }]}
                 onPress={onAssignAll}
               >
                 <Ionicons name="people-outline" size={22} color="#fff" />
                 <Text style={styles.assignButtonText}>Assign Items</Text>
-              </Pressable>
+              </AnimatedPressable>
             ) : null}
           </View>
 
@@ -188,12 +197,12 @@ export default function MultiSplitHubScreen({
 
           {/* View Summary / Done */}
           {hasCompletedReceipts ? (
-            <Pressable
+            <AnimatedPressable
               style={({ pressed }) => [styles.summaryButton, pressed && { opacity: 0.8 }]}
               onPress={onViewSummary}
             >
               <Text style={styles.summaryButtonText}>View Summary & Export</Text>
-            </Pressable>
+            </AnimatedPressable>
           ) : eventSplits.length > 0 ? (
             <Text style={[styles.muted, { textAlign: 'center', marginTop: 8, marginBottom: 24 }]}>
               Complete at least one receipt to view the summary
@@ -202,11 +211,12 @@ export default function MultiSplitHubScreen({
         </ScrollView>
       </View>
     </SafeAreaView>
+    </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, padding: 20, paddingTop: 16 },
   headerRow: {
     flexDirection: 'row',
@@ -217,10 +227,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '600', color: '#fff', flex: 1, textAlign: 'center', marginHorizontal: 12 },
   scroll: { flex: 1 },
   totalCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 24,
     alignItems: 'center',
     marginBottom: 16,
@@ -233,10 +243,10 @@ const styles = StyleSheet.create({
   receiptCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 12,
     marginBottom: 8,
     gap: 12,
@@ -264,12 +274,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: T.ctaBg,
     paddingVertical: 14,
     borderRadius: 12,
     gap: 8,
   },
-  addReceiptText: { color: '#000', fontSize: 16, fontWeight: '600' },
+  addReceiptText: { color: T.ctaText, fontSize: 16, fontWeight: '600' },
   assignButton: {
     flex: 1,
     flexDirection: 'row',
@@ -287,7 +297,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 8,
     padding: 12,
     marginBottom: 6,
@@ -305,14 +315,15 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   summaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  categoryScroll: { marginBottom: 16, flexGrow: 0 },
+  categoryRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 2 },
   categoryChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: T.cardBorder,
   },
   categoryChipSelected: {
     backgroundColor: '#fff',

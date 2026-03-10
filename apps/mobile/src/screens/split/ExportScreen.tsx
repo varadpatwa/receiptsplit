@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Share, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Share, Alert } from 'react-native';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -7,6 +8,8 @@ import type { Split } from '@receiptsplit/shared';
 import { calculateBreakdown, getReceiptTotal, generateShareableText } from '@receiptsplit/shared';
 import { Stepper } from '../../components/Stepper';
 import { ReceiptImageModal } from '../../components/ReceiptImageModal';
+import { T } from '../../theme/colors';
+import { AuroraBackground } from '../../components/AuroraBackground';
 
 interface ExportScreenProps {
   split: Split;
@@ -45,12 +48,13 @@ export function ExportScreen({ split, onBack, onReturnHome, onDelete, isGuest, o
   };
 
   return (
+    <AuroraBackground>
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Pressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
+          <AnimatedPressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
             <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.6)" />
-          </Pressable>
+          </AnimatedPressable>
           <Text style={styles.title}>Export</Text>
         </View>
         <Stepper currentStep="export" />
@@ -61,14 +65,14 @@ export function ExportScreen({ split, onBack, onReturnHome, onDelete, isGuest, o
             Send the breakdown to your group so everyone knows what they owe.
           </Text>
           <View style={styles.buttonGroup}>
-            <Pressable onPress={handleCopy} style={({ pressed }) => [styles.secondaryBtn, pressed && { opacity: 0.8 }]}>
+            <AnimatedPressable onPress={handleCopy} style={({ pressed }) => [styles.secondaryBtn, pressed && { opacity: 0.8 }]}>
               <Ionicons name="copy-outline" size={20} color="#fff" />
               <Text style={styles.secondaryBtnText}>Copy to Clipboard</Text>
-            </Pressable>
-            <Pressable onPress={handleShare} style={({ pressed }) => [styles.secondaryBtn, pressed && { opacity: 0.8 }]}>
+            </AnimatedPressable>
+            <AnimatedPressable onPress={handleShare} style={({ pressed }) => [styles.secondaryBtn, pressed && { opacity: 0.8 }]}>
               <Ionicons name="share-outline" size={20} color="#fff" />
               <Text style={styles.secondaryBtnText}>Share</Text>
-            </Pressable>
+            </AnimatedPressable>
           </View>
         </View>
 
@@ -80,10 +84,10 @@ export function ExportScreen({ split, onBack, onReturnHome, onDelete, isGuest, o
         </View>
 
         {split.receiptImagePath ? (
-          <Pressable onPress={() => setReceiptModalVisible(true)} style={({ pressed }) => [styles.secondaryBtn, { marginBottom: 16 }, pressed && { opacity: 0.8 }]}>
+          <AnimatedPressable onPress={() => setReceiptModalVisible(true)} style={({ pressed }) => [styles.secondaryBtn, { marginBottom: 16 }, pressed && { opacity: 0.8 }]}>
             <Ionicons name="receipt-outline" size={20} color="#fff" />
             <Text style={styles.secondaryBtnText}>View Receipt</Text>
-          </Pressable>
+          </AnimatedPressable>
         ) : null}
 
         {split.receiptImagePath ? (
@@ -99,35 +103,36 @@ export function ExportScreen({ split, onBack, onReturnHome, onDelete, isGuest, o
         {isGuest ? (
           <>
             {onSaveToAccount ? (
-              <Pressable onPress={onSaveToAccount} style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.8 }]}>
+              <AnimatedPressable onPress={onSaveToAccount} style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.8 }]}>
                 <Ionicons name="cloud-upload-outline" size={20} color="#000" />
                 <Text style={styles.primaryBtnText}>Save to my account</Text>
-              </Pressable>
+              </AnimatedPressable>
             ) : null}
-            <Pressable onPress={onReturnHome} style={({ pressed }) => [styles.secondaryBtn, { marginTop: 8 }, pressed && { opacity: 0.8 }]}>
+            <AnimatedPressable onPress={onReturnHome} style={({ pressed }) => [styles.secondaryBtn, { marginTop: 8 }, pressed && { opacity: 0.8 }]}>
               <Ionicons name="checkmark-done" size={20} color="#fff" />
               <Text style={styles.secondaryBtnText}>Done (temporary)</Text>
-            </Pressable>
+            </AnimatedPressable>
           </>
         ) : (
           <>
-            <Pressable onPress={onReturnHome} style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.8 }]}>
+            <AnimatedPressable onPress={onReturnHome} style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.8 }]}>
               <Ionicons name="home" size={20} color="#000" />
               <Text style={styles.primaryBtnText}>Return Home</Text>
-            </Pressable>
-            <Pressable onPress={onDelete} style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.8 }]}>
+            </AnimatedPressable>
+            <AnimatedPressable onPress={onDelete} style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.8 }]}>
               <Ionicons name="trash-outline" size={20} color="rgba(255,100,100,0.9)" />
               <Text style={styles.deleteBtnText}>Delete split</Text>
-            </Pressable>
+            </AnimatedPressable>
           </>
         )}
       </ScrollView>
     </SafeAreaView>
+    </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
@@ -135,10 +140,10 @@ const styles = StyleSheet.create({
   backBtn: { padding: 8, marginRight: 8 },
   title: { fontSize: 22, fontWeight: '600', color: '#fff' },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 16,
     marginBottom: 16,
   },
@@ -172,12 +177,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#fff',
+    backgroundColor: T.ctaBg,
     paddingVertical: 14,
     borderRadius: 12,
     marginTop: 8,
   },
-  primaryBtnText: { color: '#000', fontSize: 16, fontWeight: '600' },
+  primaryBtnText: { color: T.ctaText, fontSize: 16, fontWeight: '600' },
   deleteBtn: {
     flexDirection: 'row',
     alignItems: 'center',

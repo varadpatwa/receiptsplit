@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, Image, Alert, ActivityIndicator, Linking,
+  View, Text, StyleSheet, ScrollView, Image, Alert, ActivityIndicator, Linking,
 } from 'react-native';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -9,6 +10,8 @@ import { formatCurrency, generateId, generateAutoTitle } from '@receiptsplit/sha
 import type { Item, Split } from '@receiptsplit/shared';
 import { useAuth } from '../../contexts/AuthContext';
 import { uploadReceiptImage, parseReceiptByPath } from '../../lib/parseReceipt';
+import { T } from '../../theme/colors';
+import { AuroraBackground } from '../../components/AuroraBackground';
 
 interface CapturedReceipt {
   id: string;
@@ -124,24 +127,42 @@ export default function MultiSplitCaptureScreen({ onDone, onBack }: Props) {
   };
 
   return (
+    <AuroraBackground>
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
         <View style={styles.headerRow}>
-          <Pressable onPress={onBack} hitSlop={12}>
+          <AnimatedPressable onPress={onBack} hitSlop={12}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
-          </Pressable>
+          </AnimatedPressable>
           <Text style={styles.title}>Scan Receipts</Text>
           <View style={{ width: 24 }} />
         </View>
 
-        <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {captures.length === 0 && !loading ? (
             <View style={styles.emptyState}>
-              <Ionicons name="receipt-outline" size={64} color="rgba(255,255,255,0.2)" />
+              <View style={styles.emptyIconRing}>
+                <Ionicons name="scan-outline" size={40} color="rgba(129,140,248,0.6)" />
+              </View>
               <Text style={styles.emptyTitle}>Scan your first receipt</Text>
               <Text style={styles.emptySubtitle}>
                 Take a photo or choose from your library.{'\n'}You can add multiple receipts.
               </Text>
+
+              <View style={styles.tipsList}>
+                <View style={styles.tipRow}>
+                  <Ionicons name="sunny-outline" size={18} color="rgba(255,255,255,0.35)" />
+                  <Text style={styles.tipText}>Good lighting helps accuracy</Text>
+                </View>
+                <View style={styles.tipRow}>
+                  <Ionicons name="crop-outline" size={18} color="rgba(255,255,255,0.35)" />
+                  <Text style={styles.tipText}>Capture the full receipt</Text>
+                </View>
+                <View style={styles.tipRow}>
+                  <Ionicons name="layers-outline" size={18} color="rgba(255,255,255,0.35)" />
+                  <Text style={styles.tipText}>Add multiple receipts at once</Text>
+                </View>
+              </View>
             </View>
           ) : null}
 
@@ -157,9 +178,9 @@ export default function MultiSplitCaptureScreen({ onDone, onBack }: Props) {
                   {cap.items.length} item{cap.items.length !== 1 ? 's' : ''} · {formatCurrency(cap.total)}
                 </Text>
               </View>
-              <Pressable onPress={() => removeCapture(cap.id)} hitSlop={12}>
+              <AnimatedPressable onPress={() => removeCapture(cap.id)} hitSlop={12}>
                 <Ionicons name="close-circle" size={24} color="rgba(255,100,100,0.7)" />
-              </Pressable>
+              </AnimatedPressable>
             </View>
           ))}
 
@@ -175,9 +196,9 @@ export default function MultiSplitCaptureScreen({ onDone, onBack }: Props) {
           {error ? (
             <View style={styles.errorBanner}>
               <Text style={styles.errorText}>{error}</Text>
-              <Pressable onPress={() => setError(null)}>
+              <AnimatedPressable onPress={() => setError(null)}>
                 <Text style={styles.errorDismiss}>Dismiss</Text>
-              </Pressable>
+              </AnimatedPressable>
             </View>
           ) : null}
 
@@ -188,14 +209,14 @@ export default function MultiSplitCaptureScreen({ onDone, onBack }: Props) {
                 <Text style={styles.addMoreLabel}>Add another receipt</Text>
               ) : null}
               <View style={styles.scanRow}>
-                <Pressable style={styles.scanBtn} onPress={handleCamera}>
+                <AnimatedPressable style={styles.scanBtn} onPress={handleCamera}>
                   <Ionicons name="camera" size={22} color="#0B0B0C" />
                   <Text style={styles.scanBtnText}>Camera</Text>
-                </Pressable>
-                <Pressable style={styles.scanBtnSecondary} onPress={handleLibrary}>
+                </AnimatedPressable>
+                <AnimatedPressable style={styles.scanBtnSecondary} onPress={handleLibrary}>
                   <Ionicons name="images-outline" size={22} color="#fff" />
                   <Text style={styles.scanBtnSecondaryText}>Photos</Text>
-                </Pressable>
+                </AnimatedPressable>
               </View>
             </View>
           ) : null}
@@ -203,7 +224,7 @@ export default function MultiSplitCaptureScreen({ onDone, onBack }: Props) {
 
         {/* Continue button */}
         {captures.length > 0 ? (
-          <Pressable
+          <AnimatedPressable
             style={({ pressed }) => [styles.continueBtn, pressed && { opacity: 0.8 }]}
             onPress={handleContinue}
             disabled={loading}
@@ -211,15 +232,16 @@ export default function MultiSplitCaptureScreen({ onDone, onBack }: Props) {
             <Text style={styles.continueBtnText}>
               Continue with {captures.length} receipt{captures.length !== 1 ? 's' : ''}
             </Text>
-          </Pressable>
+          </AnimatedPressable>
         ) : null}
       </View>
     </SafeAreaView>
+    </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, padding: 20, paddingTop: 16 },
   headerRow: {
     flexDirection: 'row',
@@ -229,20 +251,50 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 20, fontWeight: '600', color: '#fff', flex: 1, textAlign: 'center', marginHorizontal: 12 },
   scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 24 },
   emptyState: {
     alignItems: 'center',
-    paddingTop: 60,
-    paddingBottom: 40,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
-  emptyTitle: { fontSize: 20, fontWeight: '600', color: '#fff', marginTop: 16, marginBottom: 8 },
+  emptyIconRing: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(99,102,241,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(99,102,241,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: { fontSize: 20, fontWeight: '600', color: '#fff', marginBottom: 8 },
   emptySubtitle: { color: 'rgba(255,255,255,0.5)', fontSize: 15, textAlign: 'center', lineHeight: 22 },
+  tipsList: {
+    marginTop: 20,
+    alignSelf: 'stretch',
+    gap: 10,
+    paddingHorizontal: 8,
+  },
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(99,102,241,0.04)',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(99,102,241,0.08)',
+  },
+  tipText: { color: 'rgba(255,255,255,0.45)', fontSize: 14 },
   captureCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 12,
     marginBottom: 10,
     gap: 12,
@@ -261,7 +313,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     padding: 20,
     marginBottom: 10,
@@ -280,7 +332,7 @@ const styles = StyleSheet.create({
   },
   errorText: { flex: 1, color: '#fca5a5', fontSize: 14 },
   errorDismiss: { color: '#fca5a5', fontSize: 14, fontWeight: '600', marginLeft: 8 },
-  scanSection: { marginTop: 8 },
+  scanSection: { marginTop: 20 },
   addMoreLabel: {
     color: 'rgba(255,255,255,0.5)',
     fontSize: 14,
@@ -293,34 +345,32 @@ const styles = StyleSheet.create({
   },
   scanBtn: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#fff',
-    paddingVertical: 16,
-    borderRadius: 12,
+    gap: 10,
+    backgroundColor: T.ctaBg,
+    paddingVertical: 22,
+    borderRadius: 14,
   },
-  scanBtnText: { fontSize: 16, fontWeight: '600', color: '#0B0B0C' },
+  scanBtnText: { fontSize: 16, fontWeight: '600', color: T.ctaText },
   scanBtnSecondary: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    paddingVertical: 16,
-    borderRadius: 12,
+    borderColor: 'rgba(255,255,255,0.15)',
+    paddingVertical: 22,
+    borderRadius: 14,
   },
   scanBtnSecondaryText: { fontSize: 16, fontWeight: '600', color: '#fff' },
   continueBtn: {
-    backgroundColor: '#fff',
+    backgroundColor: T.ctaBg,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 12,
   },
-  continueBtnText: { color: '#000', fontSize: 16, fontWeight: '600' },
+  continueBtnText: { color: T.ctaText, fontSize: 16, fontWeight: '600' },
 });

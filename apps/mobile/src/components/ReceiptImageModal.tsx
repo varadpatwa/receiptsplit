@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Image, Pressable, StyleSheet, ActivityIndicator, Text, Dimensions } from 'react-native';
+import { Modal, View, Image, StyleSheet, ActivityIndicator, Text, Dimensions } from 'react-native';
+import { AnimatedPressable } from './AnimatedPressable';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 
@@ -37,9 +38,9 @@ export function ReceiptImageModal({ visible, storagePath, onClose }: ReceiptImag
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={12}>
+        <AnimatedPressable style={styles.closeBtn} onPress={onClose} hitSlop={12}>
           <Ionicons name="close" size={28} color="#fff" />
-        </Pressable>
+        </AnimatedPressable>
         {loading ? (
           <ActivityIndicator size="large" color="#fff" />
         ) : error ? (

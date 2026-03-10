@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, ScrollView } from 'react-native';
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +8,8 @@ import { getReceiptTotal, formatCurrency } from '@receiptsplit/shared';
 import type { Split, SplitEvent, SplitCategory } from '@receiptsplit/shared';
 import { useSplits } from '../contexts/SplitsContext';
 import { useToast } from '../contexts/ToastContext';
+import { T } from '../theme/colors';
+import { AuroraBackground } from '../components/AuroraBackground';
 import { SwipeableRow } from '../components/SwipeableRow';
 import { listEvents, deleteEvent } from '../lib/events';
 import { useMultiSplitSafe } from '../contexts/MultiSplitContext';
@@ -34,6 +37,13 @@ function formatDate(ts: number): string {
 }
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'HomeList'>;
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
 
 type ListItem =
   | { type: 'split'; data: Split; sortKey: number }
@@ -75,20 +85,26 @@ export default function HomeScreen() {
       }
     }
 
-    // Add events
+    // Add events — single-receipt events are shown as regular splits
     for (const event of events) {
       const eventSplits = event.splitIds
         .map((id) => activeSplits.find((s) => s.id === id))
         .filter((s): s is Split => !!s);
       const total = eventSplits.reduce((sum, s) => sum + getReceiptTotal(s), 0);
       const mostRecent = eventSplits.reduce((max, s) => Math.max(max, s.updatedAt), event.createdAt);
-      items.push({
-        type: 'event',
-        data: event,
-        sortKey: mostRecent,
-        total,
-        receiptCount: eventSplits.length,
-      });
+
+      if (eventSplits.length === 1) {
+        // Single receipt — show as regular split card, not as a stack
+        items.push({ type: 'split', data: eventSplits[0], sortKey: mostRecent });
+      } else {
+        items.push({
+          type: 'event',
+          data: event,
+          sortKey: mostRecent,
+          total,
+          receiptCount: eventSplits.length,
+        });
+      }
     }
 
     return items.sort((a, b) => b.sortKey - a.sortKey);
@@ -145,28 +161,28 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <AuroraBackground><SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
         {saveError ? (
-          <Pressable style={styles.errorBanner} onPress={clearSaveError}>
+          <AnimatedPressable style={styles.errorBanner} onPress={clearSaveError}>
             <Text style={styles.errorBannerText}>{saveError}</Text>
             <Text style={styles.errorBannerDismiss}>Dismiss</Text>
-          </Pressable>
+          </AnimatedPressable>
         ) : null}
         <View style={styles.headerRow}>
-          <Text style={styles.title}>ReceiptSplit</Text>
+          <Text style={styles.title}>{getGreeting()}</Text>
           {!isGuest ? (
             <View style={styles.headerIcons}>
-              <Pressable
+              <AnimatedPressable
                 style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.7 }]}
                 onPress={() => navigation.navigate('Search')}
                 hitSlop={hitSlop}
                 accessibilityRole="button"
-                accessibilityLabel="Search"
+                accessibilityLabel="Ask Penny"
               >
-                <Ionicons name="search" size={24} color="#fff" />
-              </Pressable>
-              <Pressable
+                <Ionicons name="sparkles" size={22} color={T.accentSoft} />
+              </AnimatedPressable>
+              <AnimatedPressable
                 style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.7 }]}
                 onPress={() => navigation.navigate('Notifications')}
                 hitSlop={hitSlop}
@@ -174,40 +190,40 @@ export default function HomeScreen() {
                 accessibilityLabel="Notifications"
               >
                 <Ionicons name="notifications-outline" size={24} color="#fff" />
-              </Pressable>
+              </AnimatedPressable>
             </View>
           ) : null}
         </View>
         <Text style={styles.subtitle}>Split bills in under 60 seconds</Text>
 
         {/* Action Button */}
-        <Pressable
+        <AnimatedPressable
           style={({ pressed }) => [styles.newSplitButton, pressed && { opacity: 0.8 }]}
           onPress={onNewSplit}
           hitSlop={hitSlop}
         >
           <Text style={styles.newSplitText}>New Split</Text>
-        </Pressable>
+        </AnimatedPressable>
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Splits</Text>
           {availableCategories.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterRowContent}>
-              <Pressable
+              <AnimatedPressable
                 onPress={() => setCategoryFilter(null)}
                 style={[styles.filterChip, !categoryFilter && styles.filterChipActive]}
               >
                 <Text style={[styles.filterChipText, !categoryFilter && styles.filterChipTextActive]}>All</Text>
-              </Pressable>
+              </AnimatedPressable>
               {availableCategories.map((cat) => (
-                <Pressable
+                <AnimatedPressable
                   key={cat}
                   onPress={() => setCategoryFilter((prev) => prev === cat ? null : cat)}
                   style={[styles.filterChip, categoryFilter === cat && { backgroundColor: getCategoryColor(cat), borderColor: getCategoryColor(cat) }]}
                 >
                   <View style={[styles.filterDot, { backgroundColor: getCategoryColor(cat) }, categoryFilter === cat && { backgroundColor: '#fff' }]} />
                   <Text style={[styles.filterChipText, categoryFilter === cat && { color: '#fff', fontWeight: '600' }]}>{cat}</Text>
-                </Pressable>
+                </AnimatedPressable>
               ))}
             </ScrollView>
           )}
@@ -217,10 +233,14 @@ export default function HomeScreen() {
             <ActivityIndicator size="large" color="rgba(255,255,255,0.6)" />
           </View>
         ) : filteredListItems.length === 0 ? (
-          <View style={styles.emptyCard}>
+          <AnimatedPressable
+            style={({ pressed }) => [styles.emptyCard, pressed && !categoryFilter && { opacity: 0.8, transform: [{ scale: 0.99 }] }]}
+            onPress={categoryFilter ? undefined : onNewSplit}
+          >
+            {!categoryFilter && <Ionicons name="receipt-outline" size={36} color="rgba(255,255,255,0.2)" style={{ marginBottom: 12 }} />}
             <Text style={styles.emptyTitle}>{categoryFilter ? `No ${categoryFilter} splits` : 'No splits yet'}</Text>
-            <Text style={styles.muted}>{categoryFilter ? 'Try a different category or clear the filter' : 'Create your first split to start dividing bills with friends'}</Text>
-          </View>
+            <Text style={styles.muted}>{categoryFilter ? 'Try a different category or clear the filter' : 'Tap here to create your first split'}</Text>
+          </AnimatedPressable>
         ) : (
           <FlatList
             data={filteredListItems}
@@ -234,7 +254,7 @@ export default function HomeScreen() {
                     setEvents((prev) => prev.filter((e) => e.id !== evt.id));
                     showToast({ message: `"${evt.title}" deleted`, variant: 'info', duration: 4000 });
                   }}>
-                    <Pressable
+                    <AnimatedPressable
                       style={({ pressed }) => [styles.card, styles.eventCard, pressed && { opacity: 0.8 }]}
                       onPress={() => onEventPress(evt)}
                     >
@@ -250,7 +270,7 @@ export default function HomeScreen() {
                         </View>
                         <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
                       </View>
-                    </Pressable>
+                    </AnimatedPressable>
                   </SwipeableRow>
                 );
               }
@@ -267,7 +287,7 @@ export default function HomeScreen() {
                     action: { label: 'Undo', onPress: () => restoreSplit(split.id) },
                   });
                 }}>
-                  <Pressable
+                  <AnimatedPressable
                     style={({ pressed }) => [
                       styles.card,
                       catColor !== 'transparent' && { borderLeftWidth: 3, borderLeftColor: catColor },
@@ -286,7 +306,7 @@ export default function HomeScreen() {
                         </Text>
                       </View>
                     </View>
-                  </Pressable>
+                  </AnimatedPressable>
                 </SwipeableRow>
               );
             }}
@@ -295,12 +315,12 @@ export default function HomeScreen() {
           />
         )}
       </View>
-    </SafeAreaView>
+    </SafeAreaView></AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, padding: 20, paddingTop: 16 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   title: { fontSize: 28, fontWeight: '600', color: '#fff' },
@@ -308,13 +328,18 @@ const styles = StyleSheet.create({
   iconButton: { padding: 4 },
   subtitle: { color: 'rgba(255,255,255,0.6)', marginBottom: 24 },
   newSplitButton: {
-    backgroundColor: '#fff',
+    backgroundColor: T.ctaBg,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 24,
+    shadowColor: T.ctaShadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  newSplitText: { color: '#000', fontSize: 16, fontWeight: '600' },
+  newSplitText: { color: T.ctaText, fontSize: 16, fontWeight: '600' },
   sectionHeader: { marginBottom: 12 },
   sectionTitle: { fontSize: 18, fontWeight: '600', color: '#fff' },
   filterRow: { marginTop: 10 },
@@ -327,12 +352,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: T.chipBorder,
+    backgroundColor: T.chipBg,
   },
   filterChipActive: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: T.chipActiveBg,
+    borderColor: T.chipActiveBorder,
   },
   filterChipText: { color: 'rgba(255,255,255,0.7)', fontSize: 13 },
   filterChipTextActive: { color: '#fff', fontWeight: '600' },
@@ -340,14 +365,14 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 },
   list: { flex: 1 },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
+    backgroundColor: T.cardBg,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 16,
   },
   eventCard: {
-    borderColor: 'rgba(96,165,250,0.2)',
+    borderColor: 'rgba(129,140,248,0.2)',
   },
   eventIcon: { marginRight: 12 },
   cardRow: { flexDirection: 'row', alignItems: 'center' },
@@ -355,10 +380,10 @@ const styles = StyleSheet.create({
   cardName: { fontSize: 16, fontWeight: '600', color: '#fff', marginBottom: 4 },
   muted: { color: 'rgba(255,255,255,0.6)', fontSize: 14 },
   emptyCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
+    backgroundColor: T.cardBg,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 24,
     alignItems: 'center',
   },

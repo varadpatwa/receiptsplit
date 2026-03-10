@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import { AnimatedPressable } from './AnimatedPressable';
 import { Ionicons } from '@expo/vector-icons';
 
 export type ToastVariant = 'success' | 'error' | 'info';
@@ -68,19 +69,19 @@ export function Toast({ config, onDismiss }: ToastProps) {
       style={[styles.container, { backgroundColor: bg, transform: [{ translateY }], opacity }]}
       pointerEvents="box-none"
     >
-      <Pressable style={styles.inner} onPress={dismiss}>
+      <AnimatedPressable style={styles.inner} onPress={dismiss}>
         <Ionicons name={icon} size={20} color="#fff" style={styles.icon} />
         <Text style={styles.message} numberOfLines={2}>{config.message}</Text>
         {config.action && (
-          <Pressable
+          <AnimatedPressable
             onPress={() => { config.action!.onPress(); dismiss(); }}
             style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.7 }]}
             hitSlop={8}
           >
             <Text style={styles.actionText}>{config.action.label}</Text>
-          </Pressable>
+          </AnimatedPressable>
         )}
-      </Pressable>
+      </AnimatedPressable>
     </Animated.View>
   );
 }

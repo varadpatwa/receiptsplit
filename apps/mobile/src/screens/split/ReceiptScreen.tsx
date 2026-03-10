@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
   TextInput,
   Switch,
   Alert,
@@ -26,8 +25,11 @@ import {
   centsToMoneyString,
 } from '@receiptsplit/shared';
 import { Stepper } from '../../components/Stepper';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { useAuth } from '../../contexts/AuthContext';
 import { uploadReceiptImage, parseReceiptByPath, type TotalsMismatchWarning } from '../../lib/parseReceipt';
+import { T } from '../../theme/colors';
+import { AuroraBackground } from '../../components/AuroraBackground';
 
 const CATEGORIES: SplitCategory[] = ['Food', 'Grocery', 'Entertainment', 'Utilities', 'Other'];
 
@@ -263,13 +265,14 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
   };
 
   return (
+    <AuroraBackground>
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <Pressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
+          <AnimatedPressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
             <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.6)" />
-          </Pressable>
+          </AnimatedPressable>
           <TextInput
             style={styles.titleInput}
             value={split.name}
@@ -278,28 +281,28 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
             placeholderTextColor="rgba(255,255,255,0.4)"
           />
           {split.titleUserOverride && split.titleAuto ? (
-            <Pressable
+            <AnimatedPressable
               onPress={() => onUpdate({ ...split, name: split.titleAuto!, titleUserOverride: false })}
               hitSlop={8}
             >
               <Ionicons name="refresh" size={18} color="rgba(255,255,255,0.4)" />
-            </Pressable>
+            </AnimatedPressable>
           ) : null}
         </View>
         <Stepper currentStep="receipt" />
 
         {saveError && clearSaveError ? (
-          <Pressable style={styles.errorBanner} onPress={clearSaveError}>
+          <AnimatedPressable style={styles.errorBanner} onPress={clearSaveError}>
             <Text style={styles.errorBannerText}>{saveError}</Text>
             <Text style={styles.errorBannerDismiss}>Dismiss</Text>
-          </Pressable>
+          </AnimatedPressable>
         ) : null}
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Category {!hasCategory && <Text style={styles.required}>*</Text>}</Text>
           <View style={styles.chipRow}>
             {CATEGORIES.map((cat) => (
-              <Pressable
+              <AnimatedPressable
                 key={cat}
                 onPress={() => {
                   const updated: Split = { ...split, category: cat };
@@ -313,7 +316,7 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
                 style={[styles.chip, split.category === cat && styles.chipSelected]}
               >
                 <Text style={[styles.chipText, split.category === cat && styles.chipTextSelected]}>{cat}</Text>
-              </Pressable>
+              </AnimatedPressable>
             ))}
           </View>
         </View>
@@ -349,9 +352,9 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
         <View style={styles.card}>
           <View style={styles.rowSpace}>
             <Text style={styles.cardTitle}>Items</Text>
-            <Pressable onPress={addItem} style={styles.iconBtn}>
+            <AnimatedPressable onPress={addItem} style={styles.iconBtn}>
               <Ionicons name="add" size={24} color="#fff" />
-            </Pressable>
+            </AnimatedPressable>
           </View>
           {!userId ? (
             <View style={styles.guestScanBanner}>
@@ -365,20 +368,20 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
             </View>
           ) : (
             <View style={styles.scanRow}>
-              <Pressable
+              <AnimatedPressable
                 onPress={handleCameraCapture}
                 style={styles.scanBtn}
               >
                 <Ionicons name="camera" size={18} color="#0B0B0C" />
                 <Text style={styles.scanBtnText}>Scan with camera</Text>
-              </Pressable>
-              <Pressable
+              </AnimatedPressable>
+              <AnimatedPressable
                 onPress={handlePickFromLibrary}
                 style={styles.scanBtnSecondary}
               >
                 <Ionicons name="images-outline" size={18} color="#fff" />
                 <Text style={styles.scanBtnSecondaryText}>Choose from photos</Text>
-              </Pressable>
+              </AnimatedPressable>
             </View>
           )}
           {parseError ? (
@@ -386,13 +389,13 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
               <Text style={styles.parseErrorText}>{parseError}</Text>
               <View style={styles.parseErrorActions}>
                 {lastImageUri && (
-                  <Pressable onPress={handleRetry} style={styles.retryBtn}>
+                  <AnimatedPressable onPress={handleRetry} style={styles.retryBtn}>
                     <Text style={styles.retryBtnText}>Retry</Text>
-                  </Pressable>
+                  </AnimatedPressable>
                 )}
-                <Pressable onPress={() => setParseError(null)}>
+                <AnimatedPressable onPress={() => setParseError(null)}>
                   <Text style={styles.parseErrorDismiss}>Dismiss</Text>
-                </Pressable>
+                </AnimatedPressable>
               </View>
             </View>
           ) : null}
@@ -405,9 +408,9 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
                   Item sum ({formatCurrency(totalsMismatch.itemSum)}) differs from receipt subtotal ({formatCurrency(totalsMismatch.reportedSubtotal)}) by ~{totalsMismatch.differencePercent}%. Please review.
                 </Text>
               </View>
-              <Pressable onPress={() => setTotalsMismatch(null)} hitSlop={8}>
+              <AnimatedPressable onPress={() => setTotalsMismatch(null)} hitSlop={8}>
                 <Ionicons name="close" size={18} color="rgba(255,255,255,0.5)" />
-              </Pressable>
+              </AnimatedPressable>
             </View>
           ) : null}
           {split.items.length === 0 ? (
@@ -435,25 +438,25 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
                     onBlur={() => handlePriceBlur(item.id)}
                     keyboardType="decimal-pad"
                   />
-                  <Pressable onPress={() => deleteItem(item.id)} style={styles.deleteBtn}>
+                  <AnimatedPressable onPress={() => deleteItem(item.id)} style={styles.deleteBtn}>
                     <Ionicons name="trash-outline" size={20} color="rgba(255,100,100,0.9)" />
-                  </Pressable>
+                  </AnimatedPressable>
                 </View>
                 {errors[item.id] ? <Text style={styles.errorText}>{errors[item.id]}</Text> : null}
                 <View style={styles.qtyRow}>
                   <Text style={styles.muted}>Quantity:</Text>
                   <View style={styles.qtyControls}>
-                    <Pressable
+                    <AnimatedPressable
                       onPress={() => handleQuantityChange(item.id, -1)}
                       style={styles.qtyBtn}
                       disabled={item.quantity <= 1}
                     >
                       <Ionicons name="remove" size={18} color="#fff" />
-                    </Pressable>
+                    </AnimatedPressable>
                     <Text style={styles.qtyNum}>{item.quantity}</Text>
-                    <Pressable onPress={() => handleQuantityChange(item.id, 1)} style={styles.qtyBtn}>
+                    <AnimatedPressable onPress={() => handleQuantityChange(item.id, 1)} style={styles.qtyBtn}>
                       <Ionicons name="add" size={18} color="#fff" />
-                    </Pressable>
+                    </AnimatedPressable>
                   </View>
                   {item.quantity > 1 && (
                     <Text style={styles.muted}>{formatCurrency(item.priceInCents * item.quantity)}</Text>
@@ -517,21 +520,22 @@ export function ReceiptScreen({ split, onUpdate, onNext, onBack, saveError, clea
           </View>
         </View>
 
-        <Pressable
+        <AnimatedPressable
           onPress={handleNext}
           disabled={!hasValidItems || Object.keys(errors).length > 0}
           style={({ pressed }) => [styles.nextBtn, (!hasValidItems || Object.keys(errors).length > 0) && styles.nextBtnDisabled, pressed && { opacity: 0.8 }]}
         >
           <Text style={styles.nextBtnText}>Next: Add People</Text>
-        </Pressable>
+        </AnimatedPressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+    </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
@@ -539,10 +543,10 @@ const styles = StyleSheet.create({
   backBtn: { padding: 8, marginRight: 4 },
   titleInput: { flex: 1, fontSize: 22, fontWeight: '600', color: '#fff', padding: 0 },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 16,
     marginBottom: 16,
   },
@@ -574,7 +578,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#fff',
+    backgroundColor: T.ctaBg,
     paddingVertical: 10,
     borderRadius: 8,
   },
@@ -652,10 +656,10 @@ const styles = StyleSheet.create({
   iconBtn: { padding: 8 },
   emptyItems: { paddingVertical: 24, alignItems: 'center' },
   itemCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 12,
     marginBottom: 12,
   },
@@ -686,14 +690,14 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 18, fontWeight: '600', color: '#fff' },
   totalValue: { fontSize: 18, fontWeight: '600', color: '#fff' },
   nextBtn: {
-    backgroundColor: '#fff',
+    backgroundColor: T.ctaBg,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 8,
   },
   nextBtnDisabled: { opacity: 0.5 },
-  nextBtnText: { color: '#000', fontSize: 16, fontWeight: '600' },
+  nextBtnText: { color: T.ctaText, fontSize: 16, fontWeight: '600' },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',

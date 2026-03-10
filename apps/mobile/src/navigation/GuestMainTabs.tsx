@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import GuestHomeStack from './GuestHomeStack';
 import SpendingLockedScreen from '../screens/SpendingLockedScreen';
 import GuestAccountScreen from '../screens/GuestAccountScreen';
+import { T } from '../theme/colors';
+import { AnimatedTabButton } from '../components/AnimatedTabButton';
 
 const Tab = createBottomTabNavigator();
 
@@ -18,9 +20,10 @@ export default function GuestMainTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: { backgroundColor: '#0B0B0C', borderTopColor: 'rgba(255,255,255,0.1)' },
-        tabBarActiveTintColor: '#fff',
-        tabBarInactiveTintColor: 'rgba(255,255,255,0.5)',
+        tabBarStyle: { backgroundColor: T.bgTab, borderTopColor: T.bgTabBorder },
+        tabBarActiveTintColor: T.tabActive,
+        tabBarInactiveTintColor: T.tabInactive,
+        tabBarButton: (props) => <AnimatedTabButton {...props} />,
         tabBarIcon: ({ focused, color, size }) => {
           const icons = tabIcons[route.name];
           const name = icons ? (focused ? icons.focused : icons.unfocused) : 'ellipse';

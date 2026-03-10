@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { T } from '../theme/colors';
+import { AuroraBackground } from '../components/AuroraBackground';
 
 const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
 import { useAuth } from '../contexts/AuthContext';
@@ -135,7 +138,7 @@ export default function FriendsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <AuroraBackground><SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
         <Text style={styles.title}>Friends</Text>
       <Text style={styles.subtitle}>Find and connect with friends by handle.</Text>
@@ -163,14 +166,14 @@ export default function FriendsScreen() {
                 ) : hasOutgoing(p.id) ? (
                   <Text style={styles.muted}>Request sent</Text>
                 ) : (
-                  <Pressable
+                  <AnimatedPressable
                     style={({ pressed }) => [styles.smallButton, loading && styles.buttonDisabled, pressed && !loading && { opacity: 0.8 }]}
                     onPress={() => handleSendRequest(p.id)}
                     disabled={loading}
                     hitSlop={hitSlop}
                   >
                     <Text style={styles.smallButtonText}>Send request</Text>
-                  </Pressable>
+                  </AnimatedPressable>
                 )}
               </View>
             ))}
@@ -189,12 +192,12 @@ export default function FriendsScreen() {
                 ) : null}
               </View>
               <View style={styles.row}>
-                <Pressable style={({ pressed }) => [styles.iconButton, loading && styles.buttonDisabled, pressed && !loading && { opacity: 0.8 }]} onPress={() => handleAccept(r.id)} disabled={loading} hitSlop={hitSlop}>
+                <AnimatedPressable style={({ pressed }) => [styles.iconButton, loading && styles.buttonDisabled, pressed && !loading && { opacity: 0.8 }]} onPress={() => handleAccept(r.id)} disabled={loading} hitSlop={hitSlop}>
                   <Text style={styles.iconButtonText}>Accept</Text>
-                </Pressable>
-                <Pressable style={({ pressed }) => [styles.iconButton, loading && styles.buttonDisabled, pressed && !loading && { opacity: 0.8 }]} onPress={() => handleReject(r.id)} disabled={loading} hitSlop={hitSlop}>
+                </AnimatedPressable>
+                <AnimatedPressable style={({ pressed }) => [styles.iconButton, loading && styles.buttonDisabled, pressed && !loading && { opacity: 0.8 }]} onPress={() => handleReject(r.id)} disabled={loading} hitSlop={hitSlop}>
                   <Text style={styles.iconButtonText}>Reject</Text>
-                </Pressable>
+                </AnimatedPressable>
               </View>
             </View>
           ))}
@@ -231,34 +234,34 @@ export default function FriendsScreen() {
                 <Text style={styles.handle}>@{f.handle}</Text>
                 {f.display_name ? <Text style={styles.muted}>{f.display_name}</Text> : null}
               </View>
-              <Pressable onPress={() => handleRemoveFriend(f.id)} disabled={loading} hitSlop={hitSlop} style={({ pressed }) => pressed && !loading && { opacity: 0.8 }}>
+              <AnimatedPressable onPress={() => handleRemoveFriend(f.id)} disabled={loading} hitSlop={hitSlop} style={({ pressed }) => pressed && !loading && { opacity: 0.8 }}>
                 <Text style={styles.removeText}>Remove</Text>
-              </Pressable>
+              </AnimatedPressable>
             </View>
           ))
         )}
       </View>
       </View>
-    </SafeAreaView>
+    </SafeAreaView></AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, padding: 20, paddingTop: 16, paddingBottom: 32 },
   title: { fontSize: 28, fontWeight: '600', color: '#fff', marginBottom: 8 },
   subtitle: { color: 'rgba(255,255,255,0.6)', marginBottom: 24 },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
+    backgroundColor: T.cardBg,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 16,
     marginBottom: 16,
   },
   cardTitle: { fontSize: 16, fontWeight: '600', color: '#fff', marginBottom: 12 },
   input: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: T.inputBg,
     borderRadius: 8,
     padding: 12,
     color: '#fff',
@@ -273,22 +276,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: T.borderSubtle,
   },
   handle: { fontSize: 16, fontWeight: '500', color: '#fff' },
   row: { flexDirection: 'row', gap: 8 },
   smallButton: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: T.chipActiveBg,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: T.chipActiveBorder,
   },
   smallButtonText: { color: '#fff', fontSize: 14 },
   iconButton: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: T.chipActiveBg,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: T.chipActiveBorder,
   },
   iconButtonText: { color: '#fff', fontSize: 14 },
   buttonDisabled: { opacity: 0.6 },

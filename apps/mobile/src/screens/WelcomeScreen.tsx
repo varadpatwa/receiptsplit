@@ -1,7 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { useNavigation } from '@react-navigation/native';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { T } from '../theme/colors';
+import { AuroraBackground } from '../components/AuroraBackground';
 
 const hitSlop = { top: 12, bottom: 12, left: 12, right: 12 };
 
@@ -17,6 +20,7 @@ export default function WelcomeScreen() {
   };
 
   return (
+    <AuroraBackground>
     <View style={styles.container} pointerEvents="box-none">
       <View style={styles.content}>
         <Text style={styles.title}>receiptsplit</Text>
@@ -25,7 +29,7 @@ export default function WelcomeScreen() {
         )}
       </View>
       <View style={styles.buttons}>
-        <Pressable
+        <AnimatedPressable
           style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
           onPress={onSignUp}
           hitSlop={hitSlop}
@@ -33,8 +37,8 @@ export default function WelcomeScreen() {
           accessibilityLabel="Sign up for free"
         >
           <Text style={styles.primaryButtonText}>SIGN UP FOR FREE</Text>
-        </Pressable>
-        <Pressable
+        </AnimatedPressable>
+        <AnimatedPressable
           style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
           onPress={onLogIn}
           hitSlop={hitSlop}
@@ -42,8 +46,8 @@ export default function WelcomeScreen() {
           accessibilityLabel="Log in"
         >
           <Text style={styles.secondaryButtonText}>LOG IN</Text>
-        </Pressable>
-        <Pressable
+        </AnimatedPressable>
+        <AnimatedPressable
           style={({ pressed }) => [styles.guestButton, pressed && styles.pressed]}
           onPress={() => navigation.navigate('GuestMain')}
           hitSlop={hitSlop}
@@ -51,16 +55,17 @@ export default function WelcomeScreen() {
           accessibilityLabel="Try without an account"
         >
           <Text style={styles.guestButtonText}>Try without an account</Text>
-        </Pressable>
+        </AnimatedPressable>
       </View>
     </View>
+    </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B0B0C',
+    backgroundColor: 'transparent',
     paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
@@ -91,13 +96,13 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.8 },
   primaryButton: {
-    backgroundColor: '#fff',
+    backgroundColor: T.ctaBg,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
   },
   primaryButtonText: {
-    color: '#000',
+    color: T.ctaText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -114,7 +119,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: T.borderSubtle,
     paddingTop: 20,
     marginTop: 4,
   },

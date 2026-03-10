@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Pressable,
   RefreshControl,
   ScrollView,
   ActivityIndicator,
@@ -11,6 +10,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { AnimatedPressable } from '../components/AnimatedPressable';
+import { T } from '../theme/colors';
+import { AuroraBackground } from '../components/AuroraBackground';
 import {
   getIncomingRequests,
   getOutgoingRequests,
@@ -156,12 +158,13 @@ export default function NotificationsScreen() {
   }
 
   return (
+    <AuroraBackground>
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
         <View style={styles.headerRow}>
-          <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <AnimatedPressable onPress={() => navigation.goBack()} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.6)" />
-          </Pressable>
+          </AnimatedPressable>
           <Text style={styles.title}>Notifications</Text>
           <View style={styles.headerSpacer} />
         </View>
@@ -172,9 +175,9 @@ export default function NotificationsScreen() {
         ) : loadError ? (
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>{loadError}</Text>
-            <Pressable style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.8 }]} onPress={() => load()} hitSlop={hitSlop}>
+            <AnimatedPressable style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.8 }]} onPress={() => load()} hitSlop={hitSlop}>
               <Text style={styles.retryButtonText}>Retry</Text>
-            </Pressable>
+            </AnimatedPressable>
           </View>
         ) : (
           <ScrollView
@@ -209,7 +212,7 @@ export default function NotificationsScreen() {
                             ) : null}
                           </View>
                           <View style={styles.actions}>
-                            <Pressable
+                            <AnimatedPressable
                               style={({ pressed }) => [
                                 styles.acceptButton,
                                 (actingId === r.id || pressed) && { opacity: 0.8 },
@@ -223,8 +226,8 @@ export default function NotificationsScreen() {
                               ) : (
                                 <Text style={styles.acceptButtonText}>Accept</Text>
                               )}
-                            </Pressable>
-                            <Pressable
+                            </AnimatedPressable>
+                            <AnimatedPressable
                               style={({ pressed }) => [
                                 styles.declineButton,
                                 (actingId === r.id || pressed) && { opacity: 0.8 },
@@ -234,7 +237,7 @@ export default function NotificationsScreen() {
                               hitSlop={hitSlop}
                             >
                               <Text style={styles.declineButtonText}>Decline</Text>
-                            </Pressable>
+                            </AnimatedPressable>
                           </View>
                         </View>
                       ))}
@@ -276,7 +279,7 @@ export default function NotificationsScreen() {
                               </Text>
                             </View>
                             <View style={styles.actions}>
-                              <Pressable
+                              <AnimatedPressable
                                 style={[styles.acceptButton, acting && { opacity: 0.8 }]}
                                 onPress={() => handleSplitAccept(r.split_id, r.friend_user_id)}
                                 disabled={!!actingSplitKey}
@@ -287,15 +290,15 @@ export default function NotificationsScreen() {
                                 ) : (
                                   <Text style={styles.acceptButtonText}>Accept</Text>
                                 )}
-                              </Pressable>
-                              <Pressable
+                              </AnimatedPressable>
+                              <AnimatedPressable
                                 style={[styles.declineButton, acting && { opacity: 0.8 }]}
                                 onPress={() => handleSplitReject(r.split_id, r.friend_user_id)}
                                 disabled={!!actingSplitKey}
                                 hitSlop={hitSlop}
                               >
                                 <Text style={styles.declineButtonText}>Reject</Text>
-                              </Pressable>
+                              </AnimatedPressable>
                             </View>
                           </View>
                         );
@@ -309,11 +312,12 @@ export default function NotificationsScreen() {
         )}
       </View>
     </SafeAreaView>
+    </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, padding: 20, paddingTop: 16 },
   headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   headerSpacer: { width: 24 },
@@ -322,17 +326,17 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 32 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 24,
     alignItems: 'center',
   },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: '#fff', marginBottom: 8 },
   emptySubtext: { fontSize: 14, color: 'rgba(255,255,255,0.4)', textAlign: 'center' },
   errorCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(239,68,68,0.3)',
@@ -350,10 +354,10 @@ const styles = StyleSheet.create({
   section: { marginBottom: 20 },
   sectionTitle: { fontSize: 18, fontWeight: '600', color: '#fff', marginBottom: 12 },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 16,
   },
   row: {

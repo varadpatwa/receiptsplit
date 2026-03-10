@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import type { SplitEvent, Participant, Split, Item } from '@receiptsplit/shared';
-import { generateUuid, generateAutoTitle } from '@receiptsplit/shared';
+import { generateUuid, generateAutoTitle, generateEventTitle } from '@receiptsplit/shared';
 import { createEvent, addSplitToEvent, removeSplitFromEvent } from '../lib/events';
 import { useSplits } from './SplitsContext';
 
@@ -54,9 +54,8 @@ export function MultiSplitProvider({ children }: { children: React.ReactNode }) 
   }, [currentEvent, activeSplits]);
 
   const createFromCaptures = useCallback(async (captures: CapturedReceiptData[]) => {
-    // Auto-generate event title from date
-    const now = new Date();
-    const title = `Split · ${now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+    // Auto-generate event title from merchant names
+    const title = generateEventTitle(captures.map((c) => c.merchantName));
     const event = await createEvent(title);
     const splitIds: string[] = [];
 
@@ -66,7 +65,9 @@ export function MultiSplitProvider({ children }: { children: React.ReactNode }) 
       const autoTitle = generateAutoTitle({ merchantName: cap.merchantName, createdAt: Date.now() });
       const split: Split = {
         id: splitId,
-        name: cap.merchantName || `Receipt ${i + 1}`,
+        name: cap.merchantName
+          ? cap.merchantName.split(/\s+/).slice(0, 2).join(' ')
+          : `Receipt ${i + 1}`,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         items: cap.items,

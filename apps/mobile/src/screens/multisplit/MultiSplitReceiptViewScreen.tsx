@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, TextInput,
+  View, Text, StyleSheet, ScrollView, TextInput,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,9 @@ import type { Split, Item } from '@receiptsplit/shared';
 import {
   formatCurrency, generateId, isValidMoneyInput, moneyStringToCents, centsToMoneyString,
 } from '@receiptsplit/shared';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
+import { T } from '../../theme/colors';
+import { AuroraBackground } from '../../components/AuroraBackground';
 
 interface Props {
   split: Split;
@@ -74,14 +77,15 @@ export default function MultiSplitReceiptViewScreen({ split, onUpdate, onBack }:
   const total = subtotal + split.taxInCents + split.tipInCents;
 
   return (
+    <AuroraBackground>
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           {/* Header */}
           <View style={styles.header}>
-            <Pressable onPress={onBack} hitSlop={12} style={styles.backBtn}>
+            <AnimatedPressable onPress={onBack} hitSlop={12} style={styles.backBtn}>
               <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.6)" />
-            </Pressable>
+            </AnimatedPressable>
             <TextInput
               style={styles.titleInput}
               value={split.name}
@@ -95,9 +99,9 @@ export default function MultiSplitReceiptViewScreen({ split, onUpdate, onBack }:
           <View style={styles.card}>
             <View style={styles.rowSpace}>
               <Text style={styles.cardTitle}>Items</Text>
-              <Pressable onPress={addItem} style={styles.iconBtn}>
+              <AnimatedPressable onPress={addItem} style={styles.iconBtn}>
                 <Ionicons name="add" size={24} color="#fff" />
-              </Pressable>
+              </AnimatedPressable>
             </View>
             {split.items.length === 0 ? (
               <Text style={styles.muted}>No items yet.</Text>
@@ -121,9 +125,9 @@ export default function MultiSplitReceiptViewScreen({ split, onUpdate, onBack }:
                       onBlur={() => handlePriceBlur(item.id)}
                       keyboardType="decimal-pad"
                     />
-                    <Pressable onPress={() => deleteItem(item.id)} style={styles.deleteBtn}>
+                    <AnimatedPressable onPress={() => deleteItem(item.id)} style={styles.deleteBtn}>
                       <Ionicons name="trash-outline" size={20} color="rgba(255,100,100,0.9)" />
-                    </Pressable>
+                    </AnimatedPressable>
                   </View>
                   {item.quantity > 1 && (
                     <Text style={styles.muted}>Qty: {item.quantity} · {formatCurrency(item.priceInCents * item.quantity)}</Text>
@@ -189,30 +193,31 @@ export default function MultiSplitReceiptViewScreen({ split, onUpdate, onBack }:
           </View>
 
           {/* Done */}
-          <Pressable
+          <AnimatedPressable
             style={({ pressed }) => [styles.doneBtn, pressed && { opacity: 0.8 }]}
             onPress={onBack}
           >
             <Text style={styles.doneBtnText}>Done</Text>
-          </Pressable>
+          </AnimatedPressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+    </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   flex: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 4 },
   backBtn: { padding: 8, marginRight: 4 },
   titleInput: { flex: 1, fontSize: 22, fontWeight: '600', color: '#fff', padding: 0 },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 16,
     marginBottom: 16,
   },
@@ -221,23 +226,23 @@ const styles = StyleSheet.create({
   iconBtn: { padding: 8 },
   muted: { fontSize: 14, color: 'rgba(255,255,255,0.6)' },
   itemCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 12,
     marginBottom: 12,
   },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: T.inputBg,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
     color: '#fff',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
   },
   inputFlex: { flex: 1 },
   inputPrice: { width: 80, textAlign: 'right' },
@@ -250,11 +255,11 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 18, fontWeight: '600', color: '#fff' },
   totalValue: { fontSize: 18, fontWeight: '600', color: '#fff' },
   doneBtn: {
-    backgroundColor: '#fff',
+    backgroundColor: T.ctaBg,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 8,
   },
-  doneBtnText: { color: '#000', fontSize: 16, fontWeight: '600' },
+  doneBtnText: { color: T.ctaText, fontSize: 16, fontWeight: '600' },
 });

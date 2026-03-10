@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { Split, ItemAssignment } from '@receiptsplit/shared';
@@ -15,6 +16,8 @@ import {
   type AssignmentSuggestion,
 } from '../../lib/assignmentSuggestions';
 import { useAuth } from '../../contexts/AuthContext';
+import { T } from '../../theme/colors';
+import { AuroraBackground } from '../../components/AuroraBackground';
 
 interface AssignScreenProps {
   split: Split;
@@ -109,12 +112,13 @@ export function AssignScreen({ split, onUpdate, onNext, onBack, subtitle }: Assi
   };
 
   return (
+    <AuroraBackground>
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Pressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
+          <AnimatedPressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
             <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.6)" />
-          </Pressable>
+          </AnimatedPressable>
           <Text style={styles.title}>Assign Items</Text>
         </View>
         {subtitle ? (
@@ -127,7 +131,7 @@ export function AssignScreen({ split, onUpdate, onNext, onBack, subtitle }: Assi
           <View style={styles.suggestionBanner}>
             <Ionicons name="sparkles" size={20} color="rgba(34,197,94,0.9)" />
             <View style={styles.suggestionBannerText}>
-              <Text style={styles.suggestionBannerTitle}>Suggested split generated</Text>
+              <Text style={styles.suggestionBannerTitle}>Penny's suggestions</Text>
               <Text style={styles.suggestionBannerSub}>
                 {suggestedButNotApplied
                   ? `${suggestedNotAppliedCount} item${suggestedNotAppliedCount === 1 ? '' : 's'} ready to auto-assign`
@@ -135,9 +139,9 @@ export function AssignScreen({ split, onUpdate, onNext, onBack, subtitle }: Assi
               </Text>
             </View>
             {suggestedButNotApplied && (
-              <Pressable onPress={confirmAllSuggestions} style={styles.confirmSuggestionsBtn}>
+              <AnimatedPressable onPress={confirmAllSuggestions} style={styles.confirmSuggestionsBtn}>
                 <Text style={styles.confirmSuggestionsBtnText}>Apply All</Text>
-              </Pressable>
+              </AnimatedPressable>
             )}
           </View>
         )}
@@ -200,20 +204,20 @@ export function AssignScreen({ split, onUpdate, onNext, onBack, subtitle }: Assi
                 {!hasAssignment && <Ionicons name="alert-circle" size={20} color="rgba(255,200,0,0.9)" />}
               </View>
               {hasSuggestion && !hasAssignment && (
-                <Pressable
+                <AnimatedPressable
                   onPress={() => applySuggestionForItem(item.id)}
                   style={styles.useSuggestionBtn}
                 >
                   <Ionicons name="checkmark-circle-outline" size={18} color="rgba(34,197,94,0.9)" />
                   <Text style={styles.useSuggestionText}>
-                    Use suggestion: {suggestedNames || 'Split'}
+                    Penny suggests: {suggestedNames || 'Split'}
                   </Text>
                   {confidenceLabel ? (
                     <View style={[styles.confidenceBadge, sug!.confidence >= 0.8 ? styles.confidenceHigh : styles.confidenceMedium]}>
                       <Text style={styles.confidenceBadgeText}>{confidenceLabel}</Text>
                     </View>
                   ) : null}
-                </Pressable>
+                </AnimatedPressable>
               )}
               <Text style={styles.whoShared}>Who shared this?</Text>
               <View style={styles.chipRow}>
@@ -230,20 +234,21 @@ export function AssignScreen({ split, onUpdate, onNext, onBack, subtitle }: Assi
           );
         })}
 
-        <Pressable
+        <AnimatedPressable
           onPress={handleNext}
           disabled={!allAssigned}
           style={({ pressed }) => [styles.nextBtn, !allAssigned && styles.nextBtnDisabled, pressed && { opacity: 0.8 }]}
         >
           <Text style={styles.nextBtnText}>Next: Review Summary</Text>
-        </Pressable>
+        </AnimatedPressable>
       </ScrollView>
     </SafeAreaView>
+    </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
@@ -252,10 +257,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '600', color: '#fff' },
   subtitle: { fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 16, marginLeft: 36 },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 16,
     marginBottom: 16,
   },
@@ -317,10 +322,10 @@ const styles = StyleSheet.create({
   confidenceMedium: { backgroundColor: 'rgba(255,200,0,0.15)' },
   confidenceBadgeText: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.7)' },
   itemCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 16,
     marginBottom: 16,
   },
@@ -332,7 +337,7 @@ const styles = StyleSheet.create({
   muted: { fontSize: 14, color: 'rgba(255,255,255,0.6)' },
   whoShared: { fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  nextBtn: { backgroundColor: '#fff', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 8 },
+  nextBtn: { backgroundColor: T.ctaBg, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 8 },
   nextBtnDisabled: { opacity: 0.5 },
-  nextBtnText: { color: '#000', fontSize: 16, fontWeight: '600' },
+  nextBtnText: { color: T.ctaText, fontSize: 16, fontWeight: '600' },
 });

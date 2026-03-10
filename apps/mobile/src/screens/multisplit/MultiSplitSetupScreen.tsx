@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Alert } from 'react-native';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { T } from '../../theme/colors';
+import { AuroraBackground } from '../../components/AuroraBackground';
 
 interface Props {
   onNext: (title: string) => void;
@@ -21,12 +24,13 @@ export default function MultiSplitSetupScreen({ onNext, onBack }: Props) {
   };
 
   return (
+    <AuroraBackground>
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
         <View style={styles.headerRow}>
-          <Pressable onPress={onBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <AnimatedPressable onPress={onBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
-          </Pressable>
+          </AnimatedPressable>
           <Text style={styles.headerTitle}>New Multi-Split</Text>
           <View style={{ width: 24 }} />
         </View>
@@ -49,21 +53,22 @@ export default function MultiSplitSetupScreen({ onNext, onBack }: Props) {
         </View>
 
         <View style={styles.footer}>
-          <Pressable
+          <AnimatedPressable
             style={({ pressed }) => [styles.nextButton, pressed && { opacity: 0.8 }, !title.trim() && { opacity: 0.4 }]}
             onPress={handleNext}
             disabled={!title.trim()}
           >
             <Text style={styles.nextButtonText}>Next: Add People</Text>
-          </Pressable>
+          </AnimatedPressable>
         </View>
       </View>
     </SafeAreaView>
+    </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, padding: 20, paddingTop: 16 },
   headerRow: {
     flexDirection: 'row',
@@ -75,10 +80,10 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   label: { fontSize: 16, fontWeight: '600', color: '#fff', marginBottom: 12 },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: T.cardBorder,
     padding: 16,
     color: '#fff',
     fontSize: 18,
@@ -87,10 +92,10 @@ const styles = StyleSheet.create({
   hint: { color: 'rgba(255,255,255,0.4)', fontSize: 14, lineHeight: 20 },
   footer: { paddingBottom: 16 },
   nextButton: {
-    backgroundColor: '#fff',
+    backgroundColor: T.ctaBg,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
-  nextButtonText: { color: '#000', fontSize: 16, fontWeight: '600' },
+  nextButtonText: { color: T.ctaText, fontSize: 16, fontWeight: '600' },
 });

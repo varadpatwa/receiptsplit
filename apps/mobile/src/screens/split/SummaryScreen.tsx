@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { AnimatedPressable } from '../../components/AnimatedPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import type { Split } from '@receiptsplit/shared';
 import { formatCurrency, calculateBreakdown, getReceiptTotal, generateShareableText } from '@receiptsplit/shared';
 import { Stepper } from '../../components/Stepper';
+import { T } from '../../theme/colors';
+import { AuroraBackground } from '../../components/AuroraBackground';
 
 interface SummaryScreenProps {
   split: Split;
@@ -30,12 +33,13 @@ export function SummaryScreen({ split, onNext, onBack }: SummaryScreenProps) {
   };
 
   return (
+    <AuroraBackground>
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Pressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
+          <AnimatedPressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
             <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.6)" />
-          </Pressable>
+          </AnimatedPressable>
           <Text style={styles.title}>Summary</Text>
         </View>
         <Stepper currentStep="summary" />
@@ -49,10 +53,10 @@ export function SummaryScreen({ split, onNext, onBack }: SummaryScreenProps) {
 
         <View style={styles.copyRow}>
           <Text style={styles.sectionTitle}>Per-Person Breakdown</Text>
-          <Pressable onPress={handleCopy} style={({ pressed }) => [styles.copyBtn, pressed && { opacity: 0.8 }]}>
+          <AnimatedPressable onPress={handleCopy} style={({ pressed }) => [styles.copyBtn, pressed && { opacity: 0.8 }]}>
             <Ionicons name="copy-outline" size={18} color="#fff" />
             <Text style={styles.copyBtnText}>Copy</Text>
-          </Pressable>
+          </AnimatedPressable>
         </View>
         {copyMessage ? <Text style={styles.toast}>{copyMessage}</Text> : null}
 
@@ -88,16 +92,17 @@ export function SummaryScreen({ split, onNext, onBack }: SummaryScreenProps) {
           </View>
         ))}
 
-        <Pressable onPress={onNext} style={({ pressed }) => [styles.nextBtn, pressed && { opacity: 0.8 }]}>
+        <AnimatedPressable onPress={onNext} style={({ pressed }) => [styles.nextBtn, pressed && { opacity: 0.8 }]}>
           <Text style={styles.nextBtnText}>Next: Export</Text>
-        </Pressable>
+        </AnimatedPressable>
       </ScrollView>
     </SafeAreaView>
+    </AuroraBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0B0C' },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
@@ -105,10 +110,10 @@ const styles = StyleSheet.create({
   backBtn: { padding: 8, marginRight: 8 },
   title: { fontSize: 22, fontWeight: '600', color: '#fff' },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: T.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: T.cardBorder,
     padding: 16,
     marginBottom: 16,
   },
@@ -127,6 +132,6 @@ const styles = StyleSheet.create({
   breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   muted: { fontSize: 14, color: 'rgba(255,255,255,0.6)' },
   itemsSubtotal: { fontWeight: '600', color: 'rgba(255,255,255,0.8)' },
-  nextBtn: { backgroundColor: '#fff', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 8 },
-  nextBtnText: { color: '#000', fontSize: 16, fontWeight: '600' },
+  nextBtn: { backgroundColor: T.ctaBg, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 8 },
+  nextBtnText: { color: T.ctaText, fontSize: 16, fontWeight: '600' },
 });
